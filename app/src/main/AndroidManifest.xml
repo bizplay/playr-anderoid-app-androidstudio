@@ -5,19 +5,22 @@
 	android:versionName="1.8.4" >
 
 	<!-- For API versions and names see: https://source.android.com/source/build-numbers.html -->
+    <!-- Moved sdk requirements to build.gradle at app level -->
 	<!--uses-sdk
 		android:minSdkVersion="19"
 		android:targetSdkVersion="26" /-->
 
 	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
-	<!--<uses-feature android:name="android.hardware.bluetooth" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />-->
+	<uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+	<uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 	<!--<uses-feature android:name="android.hardware.camera" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.camera.any" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.consumerir" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.location" android:required="false" />-->
+    <!--<uses-feature android:name="android.hardware.location.gps" android:required="false"/>-->
 	<!--<uses-feature android:name="android.hardware.microphone" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.nfc" android:required="false" />-->
+    <uses-feature android:name="android.hardware.sensor" android:required="false"/>
 	<!--<uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.barometer" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.compass" android:required="false" />-->
@@ -26,32 +29,30 @@
 	<!--<uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.telephony" android:required="false" />-->
+	<uses-feature android:name="android.hardware.telephony" android:required="false" />
 	<uses-feature android:name="android.hardware.faketouch" android:required="false" />
 	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-	<!--<uses-feature android:name="android.hardware.usb.host" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.usb.accessory" android:required="false" />-->
+	<uses-feature android:name="android.hardware.usb.host" android:required="false" />
+	<uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
 	<!--<uses-feature android:name="android.hardware.wifi.direct" android:required="false" />-->
-	<uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
 	<uses-permission android:name="android.hardware.screen.landscape"  android:required="false"/>
 	<uses-permission android:name="android.hardware.screen.portrait"  android:required="false"/>
 	<!--<uses-permission android:name="android.hardware.television"  android:required="false"/>-->
 	<uses-permission android:name="android.hardware.wifi" />
-
-	<uses-permission android:name="android.software.app_widget" android:required="false" />
-	<uses-permission android:name="android.software.device_admin" android:required="false" />
-	<uses-permission android:name="android.software.home_screen" android:required="false" />
-	<uses-permission android:name="android.software.input_methods" android:required="false" />
+    <uses-permission android:name="android.software.app_widget" android:required="false" />
+	<!--<uses-permission android:name="android.software.device_admin" android:required="false" />-->
+	<!--<uses-permission android:name="android.software.home_screen" android:required="false" />-->
+	<!--<uses-permission android:name="android.software.input_methods" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.live_wallpaper" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.sip" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.sip.voip" android:required="false" />-->
-
-	<uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-	<uses-permission android:name="android.permission.GET_TASKS" />
+	<!--<uses-permission android:name="android.permission.GET_TASKS" />-->
 	<!-- WAKE_LOCK is used by the media player inside WebView/Chromium -->
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -75,7 +76,9 @@
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<action android:name="android.intent.action.VIEW" />
+                <!-- for non TV devices -->
 				<category android:name="android.intent.category.LAUNCHER" />
+                <!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
 				<category android:name="android.intent.category.DEFAULT" />
 			</intent-filter>
