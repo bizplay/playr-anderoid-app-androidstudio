@@ -191,9 +191,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 					 Log.e(className, "onReceivedError WebView error: " + error.getDescription()
 							 + " code: " + String.valueOf(error.getErrorCode()) + " URL: " + request.getUrl().toString());
 				 }
-                 Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-                 // super.onReceivedError(view, request, error);
-                 view.reload();
+				 Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
+				 // super.onReceivedError(view, request, error);
+				 view.reload();
 			 }
 
 			 @Override
