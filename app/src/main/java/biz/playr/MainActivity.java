@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
@@ -239,12 +240,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 					.appendQueryParameter("webview_user_agent",
 							webviewUserAgent)
 					.appendQueryParameter("webview_version", webviewVersion)
+					.appendQueryParameter("https_required", httpsRequired())
 					.appendQueryParameter("app_version", appVersion).build()
 					.toString();
 			String initialHtmlPage = "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
 					+ pageUrl + "\"</script><head><body/></html>";
 			webView.loadDataWithBaseURL("file:///android_asset/",
 					initialHtmlPage, "text/html", "UTF-8", null);
+		}
+	}
+	private String httpsRequired() {
+		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+			return "no";
+		} else {
+			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
 		}
 	}
 
