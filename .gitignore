@@ -20,6 +20,10 @@ gradlew.bat
 bin/
 gen/
 
+# Release/Debug builds
+app/release/
+app/debug/
+
 # Gradle files
 .gradle/
 build/
