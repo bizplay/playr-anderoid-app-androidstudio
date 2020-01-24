@@ -1,5 +1,5 @@
 import.txt
-build/
+*.iml
 
 # Gradle
 gradle
@@ -7,6 +7,7 @@ gradlew
 gradlew.bat
 
 # Built application files
+build/
 *.apk
 *.ap_
 
@@ -22,7 +23,7 @@ gen/
 
 # Gradle files
 .gradle/
-build/
+build.gradle
 
 # Local configuration file (sdk path, etc)
 local.properties
