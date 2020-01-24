@@ -84,7 +84,8 @@
       document.getElementById("parameters").style.display = "none";
       document.getElementById("cookie").style.display = "none";
       document.getElementById("ajax_loader").style.display = "none";
-       var windowLocation = setTimeout(function(){window.location = ("http://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version);},2000)
+      var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version
+      var timeoutHandle = setTimeout(function(){window.location = windowLocation;},2000)
     };
 
     function retryLoading() {

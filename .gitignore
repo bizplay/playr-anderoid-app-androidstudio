@@ -21,6 +21,10 @@ build/
 bin/
 gen/
 
+# Release/Debug builds
+app/release/
+app/debug/
+
 # Gradle files
 .gradle/
 build.gradle

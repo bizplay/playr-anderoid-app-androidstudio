@@ -1,16 +1,15 @@
 package biz.playr;
 
-import java.util.Objects;
+//import java.util.Objects;
 import java.util.UUID;
-
 import biz.playr.R;
-
 import android.content.ComponentName;
 import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
@@ -31,20 +30,41 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebResourceError;
-import android.webkit.WebSettings.PluginState;
+//import android.webkit.WebSettings.PluginState;
+//import androidx.webkit.WebViewCompat;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
-
+import androidx.browser.customtabs.CustomTabsCallback;
+import androidx.browser.customtabs.CustomTabsClient;
+import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.browser.customtabs.CustomTabsServiceConnection;
+import androidx.browser.customtabs.CustomTabsSession;
+import androidx.browser.customtabs.TrustedWebUtils;
+import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
+import androidx.browser.trusted.TrustedWebActivityIntent;
 //import java.lang.Thread.UncaughtExceptionHandler;
 //import android.content.Intent;
+//import android.widget.Toast;
+// packages below were migrated to androidx
+//import android.support.customtabs.CustomTabsCallback;
+//import android.support.customtabs.CustomTabsClient;
+//import android.support.customtabs.CustomTabsIntent;
+//import android.support.customtabs.CustomTabsServiceConnection;
+//import android.support.customtabs.CustomTabsSession;
+//import android.support.customtabs.TrustedWebUtils;
+
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
 	private static final String className = "biz.playr.MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
+	// TWA related
+	private boolean chromeVersionChecked = false;
+	private int SESSION_ID = 96375;
+	private boolean twaWasLaunched = false;
+	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 
 	// Callbacks for service binding, passed to bindService()
 	private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -122,6 +142,25 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.i(className, "retrieved stored playerId: " + playerId);
 		}
 
+		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
+
+		if (chromePackage != null) {
+			if (!chromeVersionChecked) {
+				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
+				chromeVersionChecked = true;
+			}
+
+			if (savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)) {
+				this.finish();
+			} else {
+				TwaCustomTabsServiceConnection serviceConnection = new TwaCustomTabsServiceConnection();
+				CustomTabsClient.bindCustomTabsService(this, chromePackage, serviceConnection);
+			}
+		} else {
+			// fall back to WebView
+		}
+
+
 		// Setup webView
 		webView = (WebView) findViewById(R.id.mainUiView);
 		Log.i(className, "webView is " + (webView == null ? "null" : "not null"));
@@ -185,7 +224,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			 * Added in API level 23 (use these when we set
 			 * android:targetSdkVersion to 23)
 			 */
-       public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+       		public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
 				 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 					 // Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
 					 Log.e(className, "onReceivedError WebView error: " + error.getDescription()
@@ -194,17 +233,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				 Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
 				 // super.onReceivedError(view, request, error);
 				 view.reload();
-			 }
+       		}
 
 			 @Override
-       public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+       		public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
 				 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 					 // Toast.makeText(getActivity(), "WebView Error" + errorResponse.getReasonPhrase(), Toast.LENGTH_SHORT).show();
 					 Log.e(className, "onReceivedHttpError WebView http error: " + errorResponse.getReasonPhrase()
 							 + " URL: " + request.getUrl().toString());
 				 }
 				 super.onReceivedHttpError(view, request, errorResponse);
-			 }
+       		}
 		});
 		webView.setKeepScreenOn(true);
 
@@ -213,11 +252,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		String appVersion = "app version not found";
 		PackageManager pm = getPackageManager();
 		PackageInfo pi;
+		PackageInfo pi2;
 		try {
 			pi = pm.getPackageInfo("com.google.android.webview", 0);
 			if (pi != null) {
-				webviewVersion = "Version name: " + pi.versionName
-						+ " Version code: " + pi.versionCode;
+				webviewVersion = "Version-name: " + pi.versionName
+						+ " -code: " + pi.versionCode;
+			}
+//			pi2 = WebViewCompat.getCurrentWebViewPackage(appContext);
+			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				pi2 = WebView.getCurrentWebViewPackage();
+				if (pi2 != null && pi != null) {
+					webviewVersion += " (Version-name: " + pi.versionName
+							+ " -code: " + pi.versionCode + ")";
+				} else if (pi2 != null && pi == null) {
+					webviewVersion = "Version-name: " + pi.versionName
+							+ " -code: " + pi.versionCode;
+				}
 			}
 		} catch (PackageManager.NameNotFoundException e) {
 			Log.e(className, "Android System WebView is not found");
@@ -239,12 +290,57 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 					.appendQueryParameter("webview_user_agent",
 							webviewUserAgent)
 					.appendQueryParameter("webview_version", webviewVersion)
+					.appendQueryParameter("https_required", httpsRequired())
 					.appendQueryParameter("app_version", appVersion).build()
 					.toString();
 			String initialHtmlPage = "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
 					+ pageUrl + "\"</script><head><body/></html>";
 			webView.loadDataWithBaseURL("file:///android_asset/",
 					initialHtmlPage, "text/html", "UTF-8", null);
+		}
+	}
+
+	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
+		private static final String className = "biz.playr.TwaCustomTabsServiceConnection";
+
+		@Override
+		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
+			client.warmup(0L);
+			CustomTabsSession session = getSession(client);
+//			CustomTabsIntent intent = getCustomTabsIntent(session);
+			Uri uri = Uri.parse("http://play.playr.biz"); // <<===### use the url for the player_loader page or the
+			Log.d(className, "Launching Trusted Web Activity.");
+			// TrustedWebUtils.launchAsTrustedWebActivity(this@LauncherActivity, session!!, intent, url);
+			TrustedWebActivityIntentBuilder trustedWebActivityIntentBuilder = new TrustedWebActivityIntentBuilder(uri);
+			TrustedWebActivityIntent trustedWebActivityIntent = trustedWebActivityIntentBuilder.build(session);
+			twaWasLaunched = true;
+		}
+
+		@Override
+		public void onServiceDisconnected(ComponentName componentName) {}
+	}
+
+	protected CustomTabsSession getSession(CustomTabsClient client) {
+		return client.newSession((CustomTabsCallback)null, SESSION_ID);
+	}
+
+	protected CustomTabsIntent getCustomTabsIntent(CustomTabsSession session) {
+		return CustomTabsIntent.Builder(session).build();
+	}
+
+	private void finishAndRemoveTaskCompat() {
+		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			this.finishAndRemoveTask();
+		} else {
+			this.finish();
+		}
+	}
+
+	private String httpsRequired() {
+		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+			return "no";
+		} else {
+			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
 		}
 	}
 
@@ -335,13 +431,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
+		webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 	}
 
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
 		Log.i(className, "override onSaveInstanceState");
 		super.onSaveInstanceState(outState);
-		webView.saveState(outState);
+		if (webView != null) { webView.saveState(outState); }
+		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
+
 	}
 
 	@Override
@@ -378,6 +478,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onRestart() {
 		Log.i(className, "override onRestart");
 		super.onRestart();
+		if (this.twaWasLaunched) {
+			this.finish();
+		}
 	}
 
 	@Override
@@ -435,6 +538,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Log.e(className,".onDestroy: super.onDestroy() !!! About to restart application !!!");
 		restartDelayed();
 		super.onDestroy();
+		if (serviceConnection != null) {
+			this.unbindService(this.serviceConnection);
+		}
 	}
 
 	@SuppressLint("InlinedApi")
