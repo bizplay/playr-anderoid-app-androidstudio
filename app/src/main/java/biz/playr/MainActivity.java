@@ -62,31 +62,34 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private boolean bound = false;
 	// TWA related
 	private boolean chromeVersionChecked = false;
-	private int SESSION_ID = 96375;
 	private boolean twaWasLaunched = false;
+	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 
+	private WebViewServiceConnection webViewServiceConnection;
+	private TwaCustomTabsServiceConnection twaServiceConnection;
+
 	// Callbacks for service binding, passed to bindService()
-	private ServiceConnection serviceConnection = new ServiceConnection() {
-		private static final String className = "ServiceConnection";
-
-		@Override
-		public void onServiceConnected(ComponentName componentName, IBinder service) {
-			Log.i(className, " override ServiceConnection.onServiceConnected");
-			// cast the IBinder and get CheckRestartService instance
-			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-			checkRestartService = binder.getService();
-			bound = true;
-			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-			Log.i(className, " ServiceConnection.onServiceConnected: service bound");
-		}
-
-		@Override
-		public void onServiceDisconnected(ComponentName componentName) {
-			Log.i(className, " override ServiceConnection.onServiceDisconnected");
-			bound = false;
-		}
-	};
+//	private ServiceConnection serviceConnection = new ServiceConnection() {
+//		private static final String className = "ServiceConnection";
+//
+//		@Override
+//		public void onServiceConnected(ComponentName componentName, IBinder service) {
+//			Log.i(className, " override ServiceConnection.onServiceConnected");
+//			// cast the IBinder and get CheckRestartService instance
+//			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+//			checkRestartService = binder.getService();
+//			bound = true;
+//			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+//			Log.i(className, " ServiceConnection.onServiceConnected: service bound");
+//		}
+//
+//		@Override
+//		public void onServiceDisconnected(ComponentName componentName) {
+//			Log.i(className, " override ServiceConnection.onServiceDisconnected");
+//			bound = false;
+//		}
+//	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -142,8 +145,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.i(className, "retrieved stored playerId: " + playerId);
 		}
 
+		// create Trusted Web Access
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
-
 		if (chromePackage != null) {
 			if (!chromeVersionChecked) {
 				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
@@ -153,8 +156,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			if (savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)) {
 				this.finish();
 			} else {
-				TwaCustomTabsServiceConnection serviceConnection = new TwaCustomTabsServiceConnection();
-				CustomTabsClient.bindCustomTabsService(this, chromePackage, serviceConnection);
+				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
+				CustomTabsClient.bindCustomTabsService(this, chromePackage, twaServiceConnection);
 			}
 		} else {
 			// fall back to WebView
@@ -247,7 +250,61 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		});
 		webView.setKeepScreenOn(true);
 
-		String webviewUserAgent = webView.getSettings().getUserAgentString();
+//		String webviewUserAgent = webView.getSettings().getUserAgentString();
+//		String webviewVersion = "Android System WebView not installed";
+//		String appVersion = "app version not found";
+//		PackageManager pm = getPackageManager();
+//		PackageInfo pi;
+//		PackageInfo pi2;
+//		try {
+//			pi = pm.getPackageInfo("com.google.android.webview", 0);
+//			if (pi != null) {
+//				webviewVersion = "Version-name: " + pi.versionName
+//						+ " -code: " + pi.versionCode;
+//			}
+////			pi2 = WebViewCompat.getCurrentWebViewPackage(appContext);
+//			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//				pi2 = WebView.getCurrentWebViewPackage();
+//				if (pi2 != null && pi != null) {
+//					webviewVersion += " (Version-name: " + pi.versionName
+//							+ " -code: " + pi.versionCode + ")";
+//				} else if (pi2 != null && pi == null) {
+//					webviewVersion = "Version-name: " + pi.versionName
+//							+ " -code: " + pi.versionCode;
+//				}
+//			}
+//		} catch (PackageManager.NameNotFoundException e) {
+//			Log.e(className, "Android System WebView is not found");
+//		}
+//		try {
+//			pi = pm.getPackageInfo(getPackageName(), 0);
+//			if (pi != null) {
+//				appVersion = pi.versionName;
+//			}
+//		} catch (PackageManager.NameNotFoundException e) {
+//			Log.e(className, getPackageName() + " is not found");
+//		}
+//
+		if (savedInstanceState == null) {
+//			String pageUrl = Uri
+//					.parse("playr_loader.html")
+//					.buildUpon()
+//					.appendQueryParameter("player_id", playerId)
+//					.appendQueryParameter("webview_user_agent",
+//							webviewUserAgent)
+//					.appendQueryParameter("webview_version", webviewVersion)
+//					.appendQueryParameter("https_required", httpsRequired())
+//					.appendQueryParameter("app_version", appVersion).build()
+//					.toString();
+//			String initialHtmlPage = "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
+//					+ pageUrl + "\"</script><head><body/></html>";
+			webView.loadDataWithBaseURL("file:///android_asset/",
+					initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+		}
+	}
+
+	private String initialHtmlPage(String playerId, String webviewUserAgent) {
+//		String webviewUserAgent = webView.getSettings().getUserAgentString();
 		String webviewVersion = "Android System WebView not installed";
 		String appVersion = "app version not found";
 		PackageManager pm = getPackageManager();
@@ -282,29 +339,48 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.e(className, getPackageName() + " is not found");
 		}
 
-		if (savedInstanceState == null) {
-			String pageUrl = Uri
-					.parse("playr_loader.html")
-					.buildUpon()
-					.appendQueryParameter("player_id", playerId)
-					.appendQueryParameter("webview_user_agent",
-							webviewUserAgent)
-					.appendQueryParameter("webview_version", webviewVersion)
-					.appendQueryParameter("https_required", httpsRequired())
-					.appendQueryParameter("app_version", appVersion).build()
-					.toString();
-			String initialHtmlPage = "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-					+ pageUrl + "\"</script><head><body/></html>";
-			webView.loadDataWithBaseURL("file:///android_asset/",
-					initialHtmlPage, "text/html", "UTF-8", null);
+		String pageUrl = Uri
+				.parse("playr_loader.html")
+				.buildUpon()
+				.appendQueryParameter("player_id", playerId)
+				.appendQueryParameter("webview_user_agent",
+						webviewUserAgent)
+				.appendQueryParameter("webview_version", webviewVersion)
+				.appendQueryParameter("https_required", httpsRequired())
+				.appendQueryParameter("app_version", appVersion).build()
+				.toString();
+		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
+				+ pageUrl + "\"</script><head><body/></html>";
+	};
+
+	// Callbacks for service binding, passed to bindService()
+	private class WebViewServiceConnection extends ServiceConnection {
+		private static final String className = "WebViewServiceConnection";
+
+		@Override
+		public void onServiceConnected(ComponentName componentName, IBinder service) {
+			Log.i(className, " override onServiceConnected");
+			// cast the IBinder and get CheckRestartService instance
+			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+			checkRestartService = binder.getService();
+			bound = true;
+			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+			Log.i(className, " onServiceConnected: service bound");
 		}
-	}
+
+		@Override
+		public void onServiceDisconnected(ComponentName componentName) {
+			Log.i(className, " override onServiceDisconnected");
+			bound = false;
+		}
+	};
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
-		private static final String className = "biz.playr.TwaCustomTabsServiceConnection";
+		private static final String className = "TwaCustomTabsServiceConnection";
 
 		@Override
 		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
+			Log.i(className, " override onCustomTabsServiceConnected");
 			client.warmup(0L);
 			CustomTabsSession session = getSession(client);
 //			CustomTabsIntent intent = getCustomTabsIntent(session);
@@ -441,7 +517,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onSaveInstanceState(outState);
 		if (webView != null) { webView.saveState(outState); }
 		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
-
 	}
 
 	@Override
@@ -450,6 +525,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onRestoreInstanceState(savedInstanceState);
 		if (savedInstanceState != null && !savedInstanceState.isEmpty()) {
 			webView.restoreState(savedInstanceState);
+			this.twaWasLaunched = savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY);
 		}
 	}
 
@@ -468,7 +544,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onStart();
 		// bind to CheckRestartService
 		Intent intent = new Intent(this, CheckRestartService.class);
-		bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+		if (webViewServiceConnection != null) {
+			bindService(intent, webViewServiceConnection, Context.BIND_AUTO_CREATE);
+			this.bound = true;
+		} else if (twaServiceConnection != null) {
+			bindService(intent, twaServiceConnection, Context.BIND_AUTO_CREATE);
+			this.bound = true;
+		}
+//		bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 //		bindService(intent, serviceConnection, Context.BIND_IMPORTANT);
 //		bindService(intent, serviceConnection, Context.BIND_ABOVE_CLIENT);
 		Log.i(className, "onStart: service bound (auto create)");
@@ -495,7 +578,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Unbind from service
 		if (bound) {
 			checkRestartService.setCallbacks(null); // unregister
-			unbindService(serviceConnection);
+			if (webViewServiceConnection != null) {
+				unbindService(webViewServiceConnection);
+			}
+			if (twaServiceConnection != null) {
+				unbindService(twaServiceConnection);
+			}
 			bound = false;
 		}
 		// The application is pushed into the background
@@ -535,12 +623,26 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// mgr.set(AlarmManager.RTC, System.currentTimeMillis() +
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//
-		// Log.e(className,".onDestroy: super.onDestroy() !!! About to restart application !!!");
+
+		// TODO: properly handling the delayed restart can only be done by letting the system handle less onDestroy events:
+		// see: https://developer.android.com/guide/topics/resources/runtime-changes#java
+		// this would mean:
+		// 1) configure onDestroy not to be called when the screen is rotated
+		// 2) calling restartDelayed() here
+		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
+		Log.e(className,".onDestroy: Delayed restart of the application !!!");
 		restartDelayed();
-		super.onDestroy();
-		if (serviceConnection != null) {
-			this.unbindService(this.serviceConnection);
+		if (this.bound) {
+			if (this.webViewServiceConnection != null) {
+				unbindService(this.webViewServiceConnection);
+				this.bound = false;
+			}
+			if (this.twaServiceConnection != null) {
+				unbindService(this.twaServiceConnection);
+				this.bound = false;
+			}
 		}
+		super.onDestroy();
 	}
 
 	@SuppressLint("InlinedApi")
