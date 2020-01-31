@@ -60,44 +60,84 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final String className = "biz.playr.MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
+	private boolean callbackSet = false;
 	// TWA related
 	private boolean chromeVersionChecked = false;
+	private boolean webViewWasLaunched = false;
 	private boolean twaWasLaunched = false;
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 
-	private WebViewServiceConnection webViewServiceConnection;
-	private TwaCustomTabsServiceConnection twaServiceConnection;
+//	private WebViewServiceConnection webViewServiceConnection;
+//	private TwaCustomTabsServiceConnection twaServiceConnection;
 
 	// Callbacks for service binding, passed to bindService()
-//	private ServiceConnection serviceConnection = new ServiceConnection() {
-//		private static final String className = "ServiceConnection";
-//
+	// set checkRestartService and set callback on it
+	// bindService happens in onStart()
+	// callback will be set to null in onStop
+	private ServiceConnection webViewServiceConnection = new ServiceConnection() {
+		private static final String className = "wv ServiceConnection";
+
+		@Override
+		public void onServiceConnected(ComponentName componentName, IBinder service) {
+			Log.i(className, "override onServiceConnected");
+			// cast the IBinder and get CheckRestartService instance
+			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+			checkRestartService = binder.getService();
+			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+			callbackSet = true;
+			Log.i(className, "onServiceConnected: callbacks set on CheckRestartService");
+		}
+
+		@Override
+		public void onServiceDisconnected(ComponentName componentName) {
+			Log.i(className, "override onServiceDisconnected");
+		}
+	};
+
+	private CustomTabsServiceConnection twaServiceConnection = new CustomTabsServiceConnection() {
+		private static final String className = "twa CustTabsServiceCon.";
+
+		@Override
+		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
+			Log.i(className, "override onCustomTabsServiceConnected");
+			client.warmup(0L);
+			CustomTabsSession session = getSession(client);
+//			CustomTabsIntent intent = getCustomTabsIntent(session);
+			Uri uri = Uri.parse("http://play.playr.biz"); // <<===### use the url for the player_loader page or the
+			Log.d(className, "Launching Trusted Web Activity.");
+			// deprecated
+			// TrustedWebUtils.launchAsTrustedWebActivity(this@LauncherActivity, session!!, intent, url);
+			// new way is not possible because of class incompatibilities
+//			TrustedWebActivityIntentBuilder trustedWebActivityIntentBuilder = new TrustedWebActivityIntentBuilder(uri);
+//			TrustedWebActivityIntent trustedWebActivityIntent = trustedWebActivityIntentBuilder.build(session);
+//			TrustedWebUtils.launchAsTrustedWebActivity(MainActivity.this, trustedWebActivityIntent, uri);
+			twaWasLaunched = true;
+		}
+
+		// onServiceConnected is final on CustomTabsServiceConnection alas
 //		@Override
 //		public void onServiceConnected(ComponentName componentName, IBinder service) {
-//			Log.i(className, " override ServiceConnection.onServiceConnected");
+//			Log.i(className, "override onServiceConnected");
 //			// cast the IBinder and get CheckRestartService instance
 //			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
 //			checkRestartService = binder.getService();
-//			bound = true;
 //			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-//			Log.i(className, " ServiceConnection.onServiceConnected: service bound");
+//			callbackSet = true;
+//			Log.i(className, "onServiceConnected: callbacks set on CheckRestartService");
 //		}
-//
-//		@Override
-//		public void onServiceDisconnected(ComponentName componentName) {
-//			Log.i(className, " override ServiceConnection.onServiceDisconnected");
-//			bound = false;
-//		}
-//	};
+
+		@Override
+		public void onServiceDisconnected(ComponentName componentName) {
+			Log.i(className, "override onServiceDisconnected");
+		}
+	};
+
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		Log.i(className, "override onCreate");
 		super.onCreate(savedInstanceState);
-		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-		requestWindowFeature(Window.FEATURE_NO_TITLE);
 
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setup restarting of app on crash");
@@ -111,7 +151,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// }
 		// }, 20000);
 
-		// Setup visibility of system bars
+		// Set up looks of the view
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		View decorView = getWindow().getDecorView();
 		decorView
 			.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
@@ -136,16 +178,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		decorView.setKeepScreenOn(true);
 		setContentView(R.layout.activity_main);
 
-		String playerId = getStoredPlayerId();
-		if (playerId == null || playerId.length() == 0) {
-			playerId = UUID.randomUUID().toString();
-			storePlayerId(playerId);
-			Log.i(className, "generated and stored playerId: " + playerId);
-		} else {
-			Log.i(className, "retrieved stored playerId: " + playerId);
-		}
+		String playerId = retrieveOrGeneratePlayerId();
 
-		// create Trusted Web Access
+		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		if (chromePackage != null) {
 			if (!chromeVersionChecked) {
@@ -163,24 +198,46 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// fall back to WebView
 		}
 
-
 		// Setup webView
 		webView = (WebView) findViewById(R.id.mainUiView);
 		Log.i(className, "webView is " + (webView == null ? "null" : "not null"));
 		setupWebView(webView);
-		webView.setWebChromeClient(new WebChromeClient() {
+		webView.setWebChromeClient(createWebChromeClient());
+		webView.setWebViewClient(createWebViewClient());
+		webView.setKeepScreenOn(true);
+		if (savedInstanceState == null) {
+			webView.loadDataWithBaseURL("file:///android_asset/",
+					initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+		}
+	}
+
+	private String retrieveOrGeneratePlayerId() {
+		String result = getStoredPlayerId();
+		if (result == null || result.length() == 0) {
+			result = UUID.randomUUID().toString();
+			storePlayerId(result);
+			Log.i(className, "generated and stored playerId: " + result);
+		} else {
+			Log.i(className, "retrieved stored playerId: " + result);
+		}
+		return result;
+	};
+
+	private WebChromeClient createWebChromeClient() {
+		return new WebChromeClient() {
 			private String className = "WebChromeClient";
 
 			// private int count = 0;
 
 			@Override
 			public void onShowCustomView(View view, CustomViewCallback callback) {
-				Log.i(className, "override setWebChromeClient");
+				Log.i(className, "override onShowCustomView");
 				super.onShowCustomView(view, callback);
 			}
 
 			@Override
 			public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+				Log.i(className, "override onConsoleMessage");
 				// Log.i(className,"override onConsoleMessage: " +
 				// consoleMessage.message());
 				// count++;
@@ -192,11 +249,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// }
 				return super.onConsoleMessage(consoleMessage);
 			}
-		});
-		webView.setWebViewClient(new WebViewClient() {
+		};
+	};
+
+	private WebViewClient createWebViewClient() {
+		return new WebViewClient() {
 			private static final String className = "biz.playr.WebViewClient";
 
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
+				Log.i(className, "shouldOverrideUrlLoading");
 				// Return false from the callback instead of calling view.loadUrl
 				// instead. Calling loadUrl introduces a subtle bug where if you
 				// have any iframe within the page with a custom scheme URL
@@ -227,83 +288,38 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			 * Added in API level 23 (use these when we set
 			 * android:targetSdkVersion to 23)
 			 */
-       		public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-				 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-					 // Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
-					 Log.e(className, "onReceivedError WebView error: " + error.getDescription()
-							 + " code: " + String.valueOf(error.getErrorCode()) + " URL: " + request.getUrl().toString());
-				 }
-				 Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-				 // super.onReceivedError(view, request, error);
-				 view.reload();
-       		}
+			@Override
+			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+				Log.i(className, "override onReceivedError");
+				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
+					Log.e(className, "onReceivedError WebView error: " + error.getDescription()
+							+ " code: " + String.valueOf(error.getErrorCode()) + " URL: " + request.getUrl().toString());
+				}
+				Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
+				// super.onReceivedError(view, request, error);
+				view.reload();
+			}
 
-			 @Override
-       		public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-				 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					 // Toast.makeText(getActivity(), "WebView Error" + errorResponse.getReasonPhrase(), Toast.LENGTH_SHORT).show();
-					 Log.e(className, "onReceivedHttpError WebView http error: " + errorResponse.getReasonPhrase()
-							 + " URL: " + request.getUrl().toString());
-				 }
-				 super.onReceivedHttpError(view, request, errorResponse);
-       		}
-		});
-		webView.setKeepScreenOn(true);
-
-//		String webviewUserAgent = webView.getSettings().getUserAgentString();
-//		String webviewVersion = "Android System WebView not installed";
-//		String appVersion = "app version not found";
-//		PackageManager pm = getPackageManager();
-//		PackageInfo pi;
-//		PackageInfo pi2;
-//		try {
-//			pi = pm.getPackageInfo("com.google.android.webview", 0);
-//			if (pi != null) {
-//				webviewVersion = "Version-name: " + pi.versionName
-//						+ " -code: " + pi.versionCode;
-//			}
-////			pi2 = WebViewCompat.getCurrentWebViewPackage(appContext);
-//			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//				pi2 = WebView.getCurrentWebViewPackage();
-//				if (pi2 != null && pi != null) {
-//					webviewVersion += " (Version-name: " + pi.versionName
-//							+ " -code: " + pi.versionCode + ")";
-//				} else if (pi2 != null && pi == null) {
-//					webviewVersion = "Version-name: " + pi.versionName
-//							+ " -code: " + pi.versionCode;
-//				}
-//			}
-//		} catch (PackageManager.NameNotFoundException e) {
-//			Log.e(className, "Android System WebView is not found");
-//		}
-//		try {
-//			pi = pm.getPackageInfo(getPackageName(), 0);
-//			if (pi != null) {
-//				appVersion = pi.versionName;
-//			}
-//		} catch (PackageManager.NameNotFoundException e) {
-//			Log.e(className, getPackageName() + " is not found");
-//		}
-//
-		if (savedInstanceState == null) {
-//			String pageUrl = Uri
-//					.parse("playr_loader.html")
-//					.buildUpon()
-//					.appendQueryParameter("player_id", playerId)
-//					.appendQueryParameter("webview_user_agent",
-//							webviewUserAgent)
-//					.appendQueryParameter("webview_version", webviewVersion)
-//					.appendQueryParameter("https_required", httpsRequired())
-//					.appendQueryParameter("app_version", appVersion).build()
-//					.toString();
-//			String initialHtmlPage = "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-//					+ pageUrl + "\"</script><head><body/></html>";
-			webView.loadDataWithBaseURL("file:///android_asset/",
-					initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
-		}
-	}
+			@Override
+			public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+				Log.i(className, "override onReceivedHttpError");
+				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					// Toast.makeText(getActivity(), "WebView Error" + errorResponse.getReasonPhrase(), Toast.LENGTH_SHORT).show();
+					Log.e(className, "onReceivedHttpError WebView http error: " + errorResponse.getReasonPhrase()
+							+ " URL: " + request.getUrl().toString());
+				}
+				super.onReceivedHttpError(view, request, errorResponse);
+			}
+		};
+	};
 
 	private String initialHtmlPage(String playerId, String webviewUserAgent) {
+		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
+				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
+	};
+
+	private String pageUrl(String playerId, String webviewUserAgent) {
 //		String webviewUserAgent = webView.getSettings().getUserAgentString();
 		String webviewVersion = "Android System WebView not installed";
 		String appVersion = "app version not found";
@@ -320,11 +336,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 				pi2 = WebView.getCurrentWebViewPackage();
 				if (pi2 != null && pi != null) {
-					webviewVersion += " (Version-name: " + pi.versionName
-							+ " -code: " + pi.versionCode + ")";
+					webviewVersion += " (Version-name: " + pi2.versionName
+							+ " -code: " + pi2.versionCode + ")";
 				} else if (pi2 != null && pi == null) {
-					webviewVersion = "Version-name: " + pi.versionName
-							+ " -code: " + pi.versionCode;
+					webviewVersion = "Version-name: " + pi2.versionName
+							+ " -code: " + pi2.versionCode;
 				}
 			}
 		} catch (PackageManager.NameNotFoundException e) {
@@ -338,19 +354,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		} catch (PackageManager.NameNotFoundException e) {
 			Log.e(className, getPackageName() + " is not found");
 		}
-
-		String pageUrl = Uri
-				.parse("playr_loader.html")
-				.buildUpon()
+		return Uri.parse("playr_loader.html").buildUpon()
 				.appendQueryParameter("player_id", playerId)
-				.appendQueryParameter("webview_user_agent",
-						webviewUserAgent)
+				.appendQueryParameter("webview_user_agent", webviewUserAgent)
 				.appendQueryParameter("webview_version", webviewVersion)
 				.appendQueryParameter("https_required", httpsRequired())
 				.appendQueryParameter("app_version", appVersion).build()
 				.toString();
-		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-				+ pageUrl + "\"</script><head><body/></html>";
 	};
 
 	// Callbacks for service binding, passed to bindService()
@@ -365,18 +375,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			checkRestartService = binder.getService();
 			bound = true;
 			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-			Log.i(className, " onServiceConnected: service bound");
+			Log.i(className, "onServiceConnected: service bound");
 		}
 
 		@Override
 		public void onServiceDisconnected(ComponentName componentName) {
-			Log.i(className, " override onServiceDisconnected");
+			Log.i(className, "override onServiceDisconnected");
 			bound = false;
 		}
 	};
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
-		private static final String className = "TwaCustomTabsServiceConnection";
+		private static final String className = "TwaCusTabsSerConnection";
 
 		@Override
 		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
@@ -393,7 +403,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 
 		@Override
-		public void onServiceDisconnected(ComponentName componentName) {}
+		public void onServiceDisconnected(ComponentName componentName) {
+			Log.i(className, "override onServiceDisconnected");
+		}
 	}
 
 	protected CustomTabsSession getSession(CustomTabsClient client) {
@@ -546,10 +558,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Intent intent = new Intent(this, CheckRestartService.class);
 		if (webViewServiceConnection != null) {
 			bindService(intent, webViewServiceConnection, Context.BIND_AUTO_CREATE);
-			this.bound = true;
+			bound = true;
 		} else if (twaServiceConnection != null) {
 			bindService(intent, twaServiceConnection, Context.BIND_AUTO_CREATE);
-			this.bound = true;
+			bound = true;
 		}
 //		bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 //		bindService(intent, serviceConnection, Context.BIND_IMPORTANT);
@@ -575,9 +587,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	protected void onStop() {
 		Log.i(className, "override onStop");
-		// Unbind from service
+		if (callbackSet) {
+			checkRestartService.setCallbacks(null);
+			callbackSet = false;
+		}
 		if (bound) {
-			checkRestartService.setCallbacks(null); // unregister
 			if (webViewServiceConnection != null) {
 				unbindService(webViewServiceConnection);
 			}
