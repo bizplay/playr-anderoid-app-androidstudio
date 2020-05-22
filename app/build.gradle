@@ -16,6 +16,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
@@ -27,5 +31,19 @@ dependencies {
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
     implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.browser:browser:1.2.0'
+//    implementation 'androidx.browser:browser:1.2.0'
+
+    // From TwaDemoJava demo project (also including maven
+    // in the build.gradle in the /gradle folder to enable
+    // inclusion of code from GitHub)
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+//    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+//    implementation 'com.google.android.material:material:1.1.0'
+//    testImplementation 'junit:junit:4.12'
+//    androidTestImplementation 'androidx.test:runner:1.1.1'
+//    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
+
+    // GITHUB customtabs version
+//    implementation 'com.github.GoogleChrome.custom-tabs-client:customtabs:d08e93fce3fb3e1f22214ee2f23fddc4f4e92634'
+    implementation 'com.github.GoogleChrome.custom-tabs-client:customtabs:master'
 }
