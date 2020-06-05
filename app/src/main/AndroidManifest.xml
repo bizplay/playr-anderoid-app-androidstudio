@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	package="biz.playr"
-	android:versionCode="25"
-	android:versionName="2.1.4" >
+	package="biz.playr" >
 
 	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
 	<uses-feature android:name="android.hardware.bluetooth" android:required="false" />
@@ -65,6 +63,12 @@
 		<!-- as alternative to singleInstance
 		<activity android:launchMode = "singleTask" />
 		-->
+		<meta-data
+			android:name="asset_statements"
+			android:resource="@string/assetStatements" />
+		<meta-data
+			android:name="cros_web_alternative"
+			android:value="@string/crosLaunchUrl" />
 		<activity
 			android:name="biz.playr.MainActivity"
 			android:hardwareAccelerated="true"
@@ -79,6 +83,11 @@
                 <!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
 				<category android:name="android.intent.category.DEFAULT" />
+				<!-- for TWA -->
+				<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>
+				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
+				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
+				<category android:name="androidx.browser.trusted.category.ImmersiveMode" />
 			</intent-filter>
 		</activity>
 		<service android:name="biz.playr.CheckRestartService" android:enabled="true" />
