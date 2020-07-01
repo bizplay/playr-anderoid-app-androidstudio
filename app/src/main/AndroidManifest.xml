@@ -63,6 +63,23 @@
 		<!-- as alternative to singleInstance
 		<activity android:launchMode = "singleTask" />
 		-->
+		<!-- To test TWA on a device and have Chrome skip the validation of the assetlinks.json file
+			pull the chrome-command-line file from the device (or create it when it is not present):
+			$ adb pull "/data/local/tmp/chrome-command-line" .
+			add the following line to it
+			--disable-digital-asset-link-verification-for-url="https://play.playr.biz"
+			save file and push it to the device
+			$ adb push chrome-command-line "/data/local/tmp/"
+
+			You can test the TWA of the Android app by starting up the view that incorporates the TWA to the target website
+			$ adb shell am start -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "http://playr.biz"
+
+			To check the status of the validation of the related web site with the TWA app use:
+			adb shell dumpsys package d
+		-->
+		<!-- to verify the http://plyr.biz/.well-known/assetlinks.json file content
+				use: https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://playr.biz&relation=delegate_permission/common.handle_all_urls
+		-->
 		<meta-data
 			android:name="asset_statements"
 			android:resource="@string/assetStatements" />
@@ -75,10 +92,11 @@
 			android:label="@string/app_name"
 			android:launchMode = "singleInstance"
 			android:keepScreenOn="true" >
-			<intent-filter>
+			<intent-filter android:autoVerify="true">
 				<action android:name="android.intent.action.MAIN" />
 				<action android:name="android.intent.action.VIEW" />
-                <!-- for non TV devices -->
+				<category android:name="android.intent.category.BROWSABLE" />
+				<!-- for non TV devices -->
 				<category android:name="android.intent.category.LAUNCHER" />
                 <!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -88,6 +106,8 @@
 				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
 				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
 				<category android:name="androidx.browser.trusted.category.ImmersiveMode" />
+				<data android:scheme="http" android:host="play.playr.biz" />
+				<data android:scheme="https" />
 			</intent-filter>
 		</activity>
 		<service android:name="biz.playr.CheckRestartService" android:enabled="true" />

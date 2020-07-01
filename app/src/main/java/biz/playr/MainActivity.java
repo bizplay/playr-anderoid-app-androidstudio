@@ -190,7 +190,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		if (chromePackage != null) {
-//		if (false) {
 			Log.i(className, ".onCreate chromePackage is not null");
 			if (!chromeVersionChecked) {
 				Log.i(className, ".onCreate !chromeVersionChecked");
@@ -208,8 +207,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				CustomTabsClient.bindCustomTabsService(this, chromePackage, this.twaServiceConnection);
 			}
 		} else {
-			// fall back to WebView
-			// Setup webView
 			webView = (WebView) findViewById(R.id.mainUiView);
 			Log.i(className, ".onCreate; webView is " + (webView == null ? "null" : "not null"));
 			setupWebView(webView);
@@ -250,7 +247,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebChromeClient createWebChromeClient() {
 		return new WebChromeClient() {
 			private String className = "WebChromeClient";
-
 			// private int count = 0;
 
 			@Override
