@@ -124,14 +124,11 @@ android {
 }
 
 dependencies {
-//    implementation 'com.android.support:support-v4:28.0.0'
-//    implementation 'com.android.support:leanback-v17:28.0.0'
-//    implementation 'com.android.support:recyclerview-v7:28.0.0'
-//    implementation 'com.android.support:cardview-v7:28.0.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
     implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.webkit:webkit:1.2.0'
 //    implementation 'androidx.browser:browser:1.2.0'
 
     // From TwaDemoJava demo project (also including maven

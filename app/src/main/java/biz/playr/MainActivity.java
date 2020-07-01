@@ -1,14 +1,10 @@
 package biz.playr;
 
-//import java.util.Objects;
 import java.util.UUID;
-import biz.playr.R;
 import android.content.ComponentName;
-import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.Window;
@@ -30,12 +26,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebResourceError;
-//import android.webkit.WebSettings.PluginState;
-//import androidx.webkit.WebViewCompat;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
-
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
@@ -43,20 +36,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
-// not used
-//import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
-//import androidx.browser.trusted.TrustedWebActivityIntent;
-//import java.lang.Thread.UncaughtExceptionHandler;
-//import android.content.Intent;
-//import android.widget.Toast;
-// packages below were migrated to androidx
-//import android.support.customtabs.CustomTabsCallback;
-//import android.support.customtabs.CustomTabsClient;
-//import android.support.customtabs.CustomTabsIntent;
-//import android.support.customtabs.CustomTabsServiceConnection;
-//import android.support.customtabs.CustomTabsSession;
-//import android.support.customtabs.TrustedWebUtils;
-
+import androidx.webkit.WebViewCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
@@ -73,72 +53,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
-//	private WebViewServiceConnection webViewServiceConnection;
-//	private TwaCustomTabsServiceConnection twaServiceConnection;
-
-	// Callbacks for service binding, passed to bindService()
-	// set checkRestartService and set callback on it
-	// bindService happens in onStart()
-	// callback will be set to null in onStop
-//	private ServiceConnection webViewServiceConnection = new ServiceConnection() {
-//		private static final String className = "wv ServiceConnection";
-//
-//		@Override
-//		public void onServiceConnected(ComponentName componentName, IBinder service) {
-//			Log.i(className, "override onServiceConnected");
-//			// cast the IBinder and get CheckRestartService instance
-//			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-//			checkRestartService = binder.getService();
-//			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-//			callbackSet = true;
-//			Log.i(className, "onServiceConnected: callbacks set on CheckRestartService");
-//		}
-//
-//		@Override
-//		public void onServiceDisconnected(ComponentName componentName) {
-//			Log.i(className, "override onServiceDisconnected");
-//		}
-//	};
-
-//    private CustomTabsServiceConnection twaServiceConnection = new CustomTabsServiceConnection() {
-////	private WebViewServiceConnection twaServiceConnection = new CustomTabsServiceConnection() {
-//		private static final String className = "twa CustTabsServiceCon.";
-//
-//		@Override
-//		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
-//			Log.i(className, "override onCustomTabsServiceConnected");
-//			client.warmup(0L);
-//			CustomTabsSession session = getSession(client);
-////			CustomTabsIntent intent = getCustomTabsIntent(session);
-//			Uri uri = Uri.parse("http://play.playr.biz"); // <<===### use the url for the player_loader page or the
-//			Log.i(className, "Launching Trusted Web Activity.");
-//			// deprecated
-//			// TrustedWebUtils.launchAsTrustedWebActivity(this@LauncherActivity, session!!, intent, url);
-//			// new way is not possible because of class incompatibilities
-////			TrustedWebActivityIntentBuilder trustedWebActivityIntentBuilder = new TrustedWebActivityIntentBuilder(uri);
-////			TrustedWebActivityIntent trustedWebActivityIntent = trustedWebActivityIntentBuilder.build(session);
-////			TrustedWebUtils.launchAsTrustedWebActivity(MainActivity.this, trustedWebActivityIntent, uri);
-//			twaWasLaunched = true;
-//		}
-
-		// onServiceConnected is final on CustomTabsServiceConnection alas
-//		@Override
-//		public void onServiceConnected(ComponentName componentName, IBinder service) {
-//			Log.i(className, "override onServiceConnected");
-//			// cast the IBinder and get CheckRestartService instance
-//			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-//			checkRestartService = binder.getService();
-//			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-//			callbackSet = true;
-//			Log.i(className, "onServiceConnected: callbacks set on CheckRestartService");
-//		}
-
-//		@Override
-//		public void onServiceDisconnected(ComponentName componentName) {
-//			Log.i(className, "override onServiceDisconnected");
-//		}
-//	};
-
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -189,7 +103,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
-		if (chromePackage != null) {
+		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
+		// * URL bar stays visible
+		// * button bar stays visible
+		// * video's with sound do not play even though they do in Chrome (whn playing the same channel)
+		if (false) {
+//		if (chromePackage != null) {
 			Log.i(className, ".onCreate chromePackage is not null");
 			if (!chromeVersionChecked) {
 				Log.i(className, ".onCreate !chromeVersionChecked");
@@ -218,18 +137,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 						initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
 			}
 		}
-
-		// Setup webView
-//		webView = (WebView) findViewById(R.id.mainUiView);
-//		Log.i(className, "webView is " + (webView == null ? "null" : "not null"));
-//		setupWebView(webView);
-//		webView.setWebChromeClient(createWebChromeClient());
-//		webView.setWebViewClient(createWebViewClient());
-//		webView.setKeepScreenOn(true);
-//		if (savedInstanceState == null) {
-//			webView.loadDataWithBaseURL("file:///android_asset/",
-//					initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
-//		}
 	}
 
 	private String retrieveOrGeneratePlayerId() {
@@ -340,7 +247,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	};
 
 	private String pageUrl(String playerId, String webviewUserAgent) {
-//		String webviewUserAgent = webView.getSettings().getUserAgentString();
 		String webviewVersion = "Android System WebView not installed";
 		String appVersion = "app version not found";
 		PackageManager pm = getPackageManager();
@@ -352,9 +258,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				webviewVersion = "Version-name: " + pi.versionName
 						+ " -code: " + pi.versionCode;
 			}
-//			pi2 = WebViewCompat.getCurrentWebViewPackage(appContext);
 			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-				pi2 = WebView.getCurrentWebViewPackage();
+//				pi2 = WebView.getCurrentWebViewPackage();
+				pi2 = WebViewCompat.getCurrentWebViewPackage(MainActivity.this);
 				if (pi2 != null && pi != null) {
 					webviewVersion += " (Version-name: " + pi2.versionName
 							+ " -code: " + pi2.versionCode + ")";
@@ -383,50 +289,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				.toString();
 	};
 
-	// Callbacks for service binding, passed to bindService()
-//	private class WebViewServiceConnection extends ServiceConnection {
-//		private static final String className = "WebViewServiceConnection";
-//
-//		@Override
-//		public void onServiceConnected(ComponentName componentName, IBinder service) {
-//			Log.i(className, " override onServiceConnected");
-//			// cast the IBinder and get CheckRestartService instance
-//			biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-//			checkRestartService = binder.getService();
-//			bound = true;
-//			checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-//			Log.i(className, "onServiceConnected: service bound");
-//		}
-//
-//		@Override
-//		public void onServiceDisconnected(ComponentName componentName) {
-//			Log.i(className, "override onServiceDisconnected");
-//			bound = false;
-//		}
-//	};
-
-//	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
-//		private static final String className = "TwaCusTabsSerConnection";
-//
-//		@Override
-//		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
-//			Log.i(className, " override onCustomTabsServiceConnected");
-//			client.warmup(0L);
-//			CustomTabsSession session = getSession(client);
-//			// CustomTabsIntent intent = getCustomTabsIntent(session);
-//			Uri uri = Uri.parse("http://play.playr.biz"); // <<===### use the url for the player_loader page or the
-//			Log.i(className, "Launching Trusted Web Activity.");
-//			// TrustedWebUtils.launchAsTrustedWebActivity(this@LauncherActivity, session!!, intent, url);
-//			TrustedWebActivityIntentBuilder trustedWebActivityIntentBuilder = new TrustedWebActivityIntentBuilder(uri);
-//			TrustedWebActivityIntent trustedWebActivityIntent = trustedWebActivityIntentBuilder.build(session);
-//			twaWasLaunched = true;
-//		}
-//
-//		@Override
-//		public void onServiceDisconnected(ComponentName componentName) {
-//			Log.i(className, "override onServiceDisconnected");
-//		}
-//	}
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
 		private static final String className = "TwaCusTabsSerConnection";
 
@@ -485,14 +347,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "restartDelayed");
 
 //		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
-		Intent activityIntent = new Intent(this.getBaseContext(),
+		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(),
 				biz.playr.MainActivity.class);
 		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 				| Intent.FLAG_ACTIVITY_CLEAR_TASK
 				| Intent.FLAG_ACTIVITY_NEW_TASK);
 		activityIntent.setAction(Intent.ACTION_MAIN);
 		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		PendingIntent localPendingIntent = PendingIntent.getActivity(this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
+		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		if (mgr != null) {
 			mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
@@ -513,7 +375,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "restartActivity");
 		// the context of the activityIntent might need to be the running PlayrService
 		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
-		Intent activityIntent = new Intent(this.getBaseContext(),
+		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(),
 				biz.playr.MainActivity.class);
 		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 				| Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -524,7 +386,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// delay start so this activity can be ended before the new one starts
 		PendingIntent pendingIntent = PendingIntent.getActivity(
-				this.getBaseContext(), 0, activityIntent,
+				MainActivity.this.getBaseContext(), 0, activityIntent,
 				PendingIntent.FLAG_ONE_SHOT);
 		// Following code will restart application after <delay> seconds
 		AlarmManager mgr = (AlarmManager) biz.playr.MainApplication
@@ -605,18 +467,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "override onStart");
 		super.onStart();
 		// bind to CheckRestartService
-		Intent intent = new Intent(this, CheckRestartService.class);
-//		if (webViewServiceConnection != null) {
-//			bindService(intent, webViewServiceConnection, Context.BIND_AUTO_CREATE);
-//			bound = true;
-//		} else if (twaServiceConnection != null) {
+		Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
 		if (twaServiceConnection != null) {
 			bindService(intent, twaServiceConnection, Context.BIND_AUTO_CREATE);
 			bound = true;
 		}
-//		bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-//		bindService(intent, serviceConnection, Context.BIND_IMPORTANT);
-//		bindService(intent, serviceConnection, Context.BIND_ABOVE_CLIENT);
 		Log.i(className, "onStart: service bound (auto create)");
 	}
 
@@ -643,9 +498,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			callbackSet = false;
 		}
 		if (bound) {
-//			if (webViewServiceConnection != null) {
-//				unbindService(webViewServiceConnection);
-//			}
 			if (twaServiceConnection != null) {
 				unbindService(twaServiceConnection);
 			}
@@ -698,10 +550,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className,".onDestroy: Delayed restart of the application !!!");
 		restartDelayed();
 		if (this.bound) {
-//			if (this.webViewServiceConnection != null) {
-//				unbindService(this.webViewServiceConnection);
-//				this.bound = false;
-//			}
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
 				this.bound = false;

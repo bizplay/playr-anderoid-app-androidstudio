@@ -66,8 +66,8 @@
 		<!-- To test TWA on a device and have Chrome skip the validation of the assetlinks.json file
 			pull the chrome-command-line file from the device (or create it when it is not present):
 			$ adb pull "/data/local/tmp/chrome-command-line" .
-			add the following line to it
-			--disable-digital-asset-link-verification-for-url="https://play.playr.biz"
+			add the following line to it (concatenate the -'s and the word following it)
+			- - disable-digital-asset-link-verification-for-url="https://play.playr.biz"
 			save file and push it to the device
 			$ adb push chrome-command-line "/data/local/tmp/"
 
