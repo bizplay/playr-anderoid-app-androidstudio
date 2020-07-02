@@ -346,6 +346,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void restartDelayed() {
 		Log.i(className, "restartDelayed");
 
+		// the context of the activityIntent might need to be the running PlayrService
+		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
 //		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
 		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(),
 				biz.playr.MainActivity.class);
@@ -354,7 +356,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				| Intent.FLAG_ACTIVITY_NEW_TASK);
 		activityIntent.setAction(Intent.ACTION_MAIN);
 		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		// delay start so this activity can be ended before the new one starts
 		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
+		// Following code will restart application after <delay> seconds
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		if (mgr != null) {
 			mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
@@ -373,30 +377,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	public void restartActivity() {
 		Log.i(className, "restartActivity");
-		// the context of the activityIntent might need to be the running PlayrService
-		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
-		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(),
-				biz.playr.MainActivity.class);
-		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-				| Intent.FLAG_ACTIVITY_CLEAR_TASK
-				| Intent.FLAG_ACTIVITY_NEW_TASK);
-		activityIntent.setAction(Intent.ACTION_MAIN);
-		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		// startActivity(activityIntent);
-
-		// delay start so this activity can be ended before the new one starts
-		PendingIntent pendingIntent = PendingIntent.getActivity(
-				MainActivity.this.getBaseContext(), 0, activityIntent,
-				PendingIntent.FLAG_ONE_SHOT);
-		// Following code will restart application after <delay> seconds
-		AlarmManager mgr = (AlarmManager) biz.playr.MainApplication
-				.getInstance().getBaseContext()
-				.getSystemService(Context.ALARM_SERVICE);
-		if (mgr != null) {
-			mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis()
-					+ DefaultExceptionHandler.restartDelay, pendingIntent);
-		}
-
+		restartDelayed();
 		Log.i(className, "restartActivity: killing this process");
 		setResult(RESULT_OK);
 		finish();
