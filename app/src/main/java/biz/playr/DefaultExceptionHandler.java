@@ -33,27 +33,26 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 	public void uncaughtException(Thread thread, Throwable ex) {
 		Log.i(className,"uncaughtException handling -> restart after delay");
 
-//		try {
+		// try {
 			// first log the exception
-			Log.e(className,"uncaughtException: Uncaught exception handling started.");
-			Log.e(className,"Exception message: " + ex.getMessage());
-			Log.e(className,"Exception: " + ex.toString());
-			Log.e(className,"Stack trace:");
+			Log.e(className, "uncaughtException: Uncaught exception handling started.");
+			Log.e(className, "Exception message: " + ex.getMessage());
+			Log.e(className, "Exception: " + ex.toString());
+			Log.e(className, "Stack trace:");
 			StackTraceElement[] arr = ex.getStackTrace();
 			for (StackTraceElement element : arr) {
-				Log.e(className,"    " + element.toString()+"\n");
+				Log.e(className, "    " + element.toString() + "\n");
 			}
 			// If the exception was thrown in a background thread inside
 			// AsyncTask, then the actual exception can be found with getCause
 			Throwable cause = ex.getCause();
-			if(cause != null) {
-				Log.e(className,"Cause: " + cause.toString());
+			if (cause != null) {
+				Log.e(className, "Cause: " + cause.toString());
 				arr = cause.getStackTrace();
 				for (StackTraceElement element : arr) {
-					Log.e(className,"    " + element.toString()+"\n");
+					Log.e(className, "    " + element.toString() + "\n");
 				}
 			}
-
 			Intent intent = new Intent(activity, biz.playr.MainActivity.class);
 
 			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -78,7 +77,6 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 //			Log.e(className,"uncaughtException: System.exit(2) !!! About to restart application !!!");
 //			System.exit(2);
 //		} catch (Exception e) {
-//			Log.e(className,".uncaughtException catch block: Exception message: " + e.getMessage());
 //			Log.e(className,".uncaughtException catch block: Exception message: " + e.getMessage());
 //			e.printStackTrace();
 //		}

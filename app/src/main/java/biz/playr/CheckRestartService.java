@@ -55,6 +55,7 @@ public class CheckRestartService extends Service {
 	// END alternative for timer
 	//
 
+
 	// see https://stackoverflow.com/a/23587641/813660 answer for https://stackoverflow.com/questions/23586031/calling-activity-class-method-from-service-class
 	// on how to enable calling a method on an Activity from a Service
 	// having a direct reference is considered very bad practise
@@ -62,7 +63,6 @@ public class CheckRestartService extends Service {
 	private final IBinder binder = new LocalBinder();
 	// Registered callbacks
 	private IServiceCallbacks serviceCallbacks;
-
 
 	// Class used for the client Binder.
 	class LocalBinder extends Binder {
@@ -100,7 +100,7 @@ public class CheckRestartService extends Service {
 
 			@Override
 			public void run() {
-				Log.i(className, "run");
+				Log.i(className, ".run");
 				// If you wish to stop the task/polling
 				if (stopTask) {
 					this.cancel();
@@ -109,19 +109,18 @@ public class CheckRestartService extends Service {
 				// check the server if restart is needed
 				boolean restartMainActivity = checkServerForRestart();
 				if (restartMainActivity) {
-					Log.i(className, "run: MainActivity has to be restarted");
+					Log.i(className, ".run: MainActivity has to be restarted");
 					if (serviceCallbacks != null) {
-						Log.i(className, "run: restarting MainActivity");
+						Log.i(className, ".run: restarting MainActivity");
 						serviceCallbacks.restartActivityWithDelay();
 					} else {
-						Log.e(className, "run: restarting MainActivity impossible; serviceCallbacks is null");
+						Log.e(className, ".run: restarting MainActivity impossible; serviceCallbacks is null");
 					}
 				} else {
-					Log.i(className, "run: MainActivity does not need to be restarted");
+					Log.i(className, ".run: MainActivity does not need to be restarted");
 				}
 			}
 		};
-
 		timer = new Timer();
 		timer.scheduleAtFixedRate(task, intervalBetweenRestartChecks, intervalBetweenRestartChecks);
 
@@ -162,7 +161,6 @@ public class CheckRestartService extends Service {
 			Log.e(className, ".checkServerForRestart serviceCallbacks is null");
 		}
 
-
 		if (!playerId.isEmpty()) {
 			try {
 				URL url = new URL("http://ajax.playr.biz/watchdogs/" + playerId + "/command");
@@ -171,11 +169,9 @@ public class CheckRestartService extends Service {
 				InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
 				response = readStream(inputStream).trim();
 			} catch (MalformedURLException e) {
-				Log.e(className,
-					".checkServerForRestart malformed URL exception opening connection; " + e.getMessage());
+				Log.e(className, ".checkServerForRestart: malformed URL exception opening connection; " + e.getMessage());
 			} catch (IOException e) {
-				Log.e(className,
-					".checkServerForRestart IO exception opening connection; " + e.getMessage());
+				Log.e(className, ".checkServerForRestart: IO exception opening connection; " + e.getMessage());
 			} finally {
 				urlConnection.disconnect();
 			}

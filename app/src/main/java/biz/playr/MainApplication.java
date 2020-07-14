@@ -14,9 +14,9 @@ public class MainApplication extends Application {
 	public void onCreate() {
 		Log.i(className,"override onCreate");
 		super.onCreate();
-
-		// Setup singleton instance
+		Log.i(className,".onCreate: Setup singleton instance");
 		instance = this;
+		Log.i(className,".onCreate end");
 	}
 
 	// Getter to access Singleton instance

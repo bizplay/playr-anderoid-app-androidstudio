@@ -76,26 +76,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		View decorView = getWindow().getDecorView();
-		decorView
-			.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
-				@Override
-				public void onSystemUiVisibilityChange(int visibility) {
-					// Note that system bars will only be "visible" if none of the
-					// LOW_PROFILE, HIDE_NAVIGATION, or FULLSCREEN flags are set.
-					if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-						// bars are visible => user touched the screen, make
-						// the bars disappear again in 2 seconds
-						Handler handler = new Handler();
-						handler.postDelayed(new Runnable() {
-							public void run() {
-								hideBars();
-							}
-						}, 2000);
-					} else {
-						// The system bars are NOT visible => do nothing
-					}
+		decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
+			@Override
+			public void onSystemUiVisibilityChange(int visibility) {
+				// Note that system bars will only be "visible" if none of the
+				// LOW_PROFILE, HIDE_NAVIGATION, or FULLSCREEN flags are set.
+				if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+					// bars are visible => user touched the screen, make the bars disappear again in 2 seconds
+					Handler handler = new Handler();
+					handler.postDelayed(new Runnable() {
+						public void run() {
+							hideBars();
+						}
+					}, 2000);
+				} else {
+					// The system bars are NOT visible => do nothing
 				}
-			});
+			}
+		});
 		decorView.setKeepScreenOn(true);
 		setContentView(R.layout.activity_main);
 
@@ -169,10 +167,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// consoleMessage.message());
 				// count++;
 				// if (count == 10) {
-				// Log.i(className,">>>>>> override onConsoleMessage, throw Exception");
+				// Log.i(className, ">>>>>> override onConsoleMessage, throw Exception");
 				// // throw new IllegalArgumentException("Test exception");
 				// } else {
-				// Log.i(className,">>>>>> override onConsoleMessage, count = " + count);
+				// Log.i(className, ">>>>>> override onConsoleMessage, count = " + count);
 				// }
 				return super.onConsoleMessage(consoleMessage);
 			}
@@ -184,48 +182,53 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			private static final String className = "biz.playr.WebViewClient";
 
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
-				Log.i(className, "shouldOverrideUrlLoading");
+				Log.i(className, ".shouldOverrideUrlLoading");
 				// Return false from the callback instead of calling view.loadUrl
 				// instead. Calling loadUrl introduces a subtle bug where if you
 				// have any iframe within the page with a custom scheme URL
 				// (say <iframe src="tel:123"/>) it will navigate your app's
-				// main frame to that URL most likely breaking the app as a side
-				// effect.
+				// main frame to that URL most likely breaking the app as a side effect.
 				// http://stackoverflow.com/questions/4066438/android-webview-how-to-handle-redirects-in-app-instead-of-opening-a-browser
 				return false; // then it is not handled by default action
 			}
 
 			/*
-			 * this version of this method si deprecated from API version 23
+			 * this version of this method is deprecated from API version 23
 			 */
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
 				Log.i(className, "override onReceivedError");
-				// Toast.makeText(getActivity(), "WebView Error" +
-				// description(), Toast.LENGTH_SHORT).show();
-				Log.e(className, "WebView(Client) error: " + description
-						+ " code: " + String.valueOf(errorCode) + " URL: "
-						+ failingUrl);
-				Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-				// super.onReceivedError(view, errorCode, description, failingUrl);
-				view.reload();
+				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
+				Log.e(className, "WebView(Client) error: " + description + " code: " + String.valueOf(errorCode) + " URL: " + failingUrl);
+				if ("net::".equals(description.subSequence(0,5))) {
+					// ignore network errors
+				} else {
+					Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
+					// super.onReceivedError(view, request, error);
+					view.reload();
+				}
 			}
 
 			/*
-			 * Added in API level 23 (use these when we set
-			 * android:targetSdkVersion to 23)
+			 * Added in API level 23 (use these when we set android:targetSdkVersion to 23)
 			 */
 			@Override
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
 				Log.i(className, "override onReceivedError");
-				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
 					Log.e(className, "onReceivedError WebView error: " + error.getDescription()
 							+ " code: " + String.valueOf(error.getErrorCode()) + " URL: " + request.getUrl().toString());
 				}
-				Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-				// super.onReceivedError(view, request, error);
-				view.reload();
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					if ("net::".equals(error.getDescription().subSequence(0,5))) {
+						// ignore network errors
+					} else {
+						Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
+						// super.onReceivedError(view, request, error);
+						view.reload();
+					}
+				}
 			}
 
 			@Override
@@ -349,8 +352,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// the context of the activityIntent might need to be the running PlayrService
 		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
 //		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
-		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(),
-				biz.playr.MainActivity.class);
+		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
 		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 				| Intent.FLAG_ACTIVITY_CLEAR_TASK
 				| Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -370,6 +372,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void restartActivityWithDelay() {
 		this.restartActivity();
 	}
+
 	public String getPlayerId() {
 		return getStoredPlayerId();
 	}
@@ -505,7 +508,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// a restart of the application when this method is called.
 		// Having this logic here causes a restart loop when the device changes
 		// aspect the ratio.
-		// Log.e(className,".onDestroy: Prepare to restart the app.");
+		// Log.e(className, ".onDestroy: Prepare to restart the app.");
 		// Intent intent = new Intent(this, biz.playr.MainActivity.class);
 		//
 		// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -516,8 +519,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, intent.getFlags());
 		//
 		// //Following code will restart your application after <delay> seconds
-		// AlarmManager mgr = (AlarmManager)
-		// biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
+		// AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
 		// mgr.set(AlarmManager.RTC, System.currentTimeMillis() +
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//

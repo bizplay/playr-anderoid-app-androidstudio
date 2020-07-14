@@ -26,8 +26,8 @@ public class BootUpReceiver extends BroadcastReceiver{
 			activityIntent.setAction(Intent.ACTION_MAIN);
 			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 			context.startActivity(activityIntent);
-			Log.i(className,"service started");
+			Log.i(className, "service started");
 		}
-		Log.i(className,"onReceive: end");
+		Log.i(className, "onReceive: end");
 	}
 }

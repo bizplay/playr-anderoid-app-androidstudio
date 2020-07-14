@@ -9,10 +9,10 @@
 	<!--<uses-feature android:name="android.hardware.camera.any" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.consumerir" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.location" android:required="false" />-->
-    <!--<uses-feature android:name="android.hardware.location.gps" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.location.gps" android:required="false"/>-->
 	<!--<uses-feature android:name="android.hardware.microphone" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.nfc" android:required="false" />-->
-    <uses-feature android:name="android.hardware.sensor" android:required="false"/>
+	<uses-feature android:name="android.hardware.sensor" android:required="false"/>
 	<!--<uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.barometer" android:required="false" />-->
 	<!--<uses-feature android:name="android.hardware.sensor.compass" android:required="false" />-->
@@ -28,20 +28,21 @@
 	<uses-feature android:name="android.hardware.usb.host" android:required="false" />
 	<uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
 	<!--<uses-feature android:name="android.hardware.wifi.direct" android:required="false" />-->
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+	<uses-feature android:name="android.software.leanback" android:required="false" />
 
-	<uses-permission android:name="android.hardware.screen.landscape"  android:required="false"/>
-	<uses-permission android:name="android.hardware.screen.portrait"  android:required="false"/>
-	<!--<uses-permission android:name="android.hardware.television"  android:required="false"/>-->
+	<uses-permission android:name="android.hardware.screen.landscape" android:required="false" />
+	<uses-permission android:name="android.hardware.screen.portrait" android:required="false" />
+	<!--<uses-permission android:name="android.hardware.television" android:required="false" />-->
 	<uses-permission android:name="android.hardware.wifi" />
-    <uses-permission android:name="android.software.app_widget" android:required="false" />
+
+	<!--<uses-permission android:name="android.software.app_widget" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.device_admin" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.home_screen" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.input_methods" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.live_wallpaper" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.sip" android:required="false" />-->
 	<!--<uses-permission android:name="android.software.sip.voip" android:required="false" />-->
-    <uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -92,22 +93,24 @@
 			android:label="@string/app_name"
 			android:launchMode = "singleInstance"
 			android:keepScreenOn="true" >
-			<intent-filter android:autoVerify="true">
+			<!-- for TWA -->
+			<!--<intent-filter android:autoVerify="true">-->
+			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.BROWSABLE" />
 				<!-- for non TV devices -->
 				<category android:name="android.intent.category.LAUNCHER" />
-                <!-- for non AndroidTV devices -->
+				<!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<!-- for TWA -->
-				<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>
-				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
-				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
-				<category android:name="androidx.browser.trusted.category.ImmersiveMode" />
-				<data android:scheme="http" android:host="play.playr.biz" />
-				<data android:scheme="https" />
+				<!--<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>-->
+				<!--<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>-->
+				<!--<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>-->
+				<!--<category android:name="androidx.browser.trusted.category.ImmersiveMode" />-->
+				<!--<data android:scheme="http" android:host="play.playr.biz" />-->
+				<!--<data android:scheme="https" />-->
 			</intent-filter>
 		</activity>
 		<service android:name="biz.playr.CheckRestartService" android:enabled="true" />
