@@ -283,11 +283,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		} catch (PackageManager.NameNotFoundException e) {
 			Log.e(className, getPackageName() + " is not found");
 		}
+		// ignore preference of the OS for use of https
 		return Uri.parse("playr_loader.html").buildUpon()
 				.appendQueryParameter("player_id", playerId)
 				.appendQueryParameter("webview_user_agent", webviewUserAgent)
 				.appendQueryParameter("webview_version", webviewVersion)
-				.appendQueryParameter("https_required", httpsRequired())
+				.appendQueryParameter("https_required", "no")
 				.appendQueryParameter("app_version", appVersion).build()
 				.toString();
 	};
