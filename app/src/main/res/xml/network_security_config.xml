@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- The default configuration for apps targeting Android 9 (API level 28) and higher -->
+    <!-- base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config -->
+    <!-- The default configuration for apps targeting Android 7.0 (API level 24) to Android 8.1 (API level 27) -->
+    <!-- base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config -->
+    <!-- The default configuration for apps targeting Android 6.0 (API level 23) and lower -->
+    <!-- base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">playr.biz</domain>
         <domain includeSubdomains="true">youtube.com</domain>
