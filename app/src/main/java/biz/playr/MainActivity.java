@@ -451,13 +451,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onStart() {
 		Log.i(className, "override onStart");
 		super.onStart();
-		// bind to CheckRestartService
-		Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
-		if (twaServiceConnection != null) {
-			bindService(intent, twaServiceConnection, Context.BIND_AUTO_CREATE);
+		if (this.twaServiceConnection != null) {
+			// bind to CheckRestartService
+			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
+			bindService(intent, this.twaServiceConnection, Context.BIND_AUTO_CREATE);
+			Log.i(className, "onStart: service bound (auto create)");
 			bound = true;
+		} else {
+			Log.i(className, "onStart: twaServiceConnection is null; restart service not bound");
 		}
-		Log.i(className, "onStart: service bound (auto create)");
 	}
 
 	@Override
@@ -483,8 +485,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			callbackSet = false;
 		}
 		if (bound) {
-			if (twaServiceConnection != null) {
-				unbindService(twaServiceConnection);
+			if (this.twaServiceConnection != null) {
+				unbindService(this.twaServiceConnection);
 			}
 			bound = false;
 		}

@@ -67,6 +67,7 @@ public class CheckRestartService extends Service {
 	// Class used for the client Binder.
 	class LocalBinder extends Binder {
 		CheckRestartService getService() {
+			Log.i(className, "getService");
 			// Return this instance of CheckRestartService so clients can call public methods
 			return CheckRestartService.this;
 		}
@@ -79,7 +80,8 @@ public class CheckRestartService extends Service {
 	}
 
 	public void setCallbacks(IServiceCallbacks callbacks) {
-		serviceCallbacks = callbacks;
+		Log.i(className, "setCallbacks");
+		this.serviceCallbacks = callbacks;
 	}
 	// end of code to link to Activity
 
@@ -163,7 +165,7 @@ public class CheckRestartService extends Service {
 
 		if (!playerId.isEmpty()) {
 			try {
-				URL url = new URL("http://ajax.playr.biz/watchdogs/" + playerId + "/command");
+				URL url = new URL("https://ajax.playr.biz/watchdogs/" + playerId + "/command");
 				Log.i(className, ".checkServerForRestart URL: " + url.toString());
 				urlConnection = (HttpURLConnection) url.openConnection();
 				InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
