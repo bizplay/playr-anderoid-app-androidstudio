@@ -384,11 +384,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				| Intent.FLAG_ACTIVITY_NEW_TASK);
 		activityIntent.setAction(Intent.ACTION_MAIN);
 		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		// delay start so this activity can be ended before the new one starts
 		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
-		// Following code will restart application after <delay> seconds
+		// delay start so this activity can be ended before the new one starts
+		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		if (mgr != null) {
+			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
 			mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
 		}
 		Log.i(className, "restartDelayed: end");
@@ -405,13 +406,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	// end of implementation IServiceCallbacks
 
 	public void restartActivity() {
-		Log.i(className, "restartActivity");
+		Log.i(className, "restartActivity: setting up delayed restart");
 		restartDelayed();
 		Log.i(className, "restartActivity: killing this process");
 		setResult(RESULT_OK);
+		Log.i(className, "restartActivity: calling finish()");
 		finish();
-		android.os.Process.killProcess(android.os.Process.myPid());
-		// System.exit(2);
+//		Log.i(className, "restartActivity: calling killProcess()");
+//		android.os.Process.killProcess(android.os.Process.myPid());
+//		Log.i(className, "restartActivity: calling exit(2)");
+//		System.exit(2);
 	}
 
 	@SuppressLint("SetJavaScriptEnabled")
@@ -584,7 +588,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			checkRestartService.setCallbacks(null);
 			Log.i(className, "onStop: callbacks set to null on restart service");
 		}
-		// the onStop method should have unboumd the service already, but just to be sure
+		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
