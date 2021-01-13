@@ -2,9 +2,11 @@ package biz.playr;
 
 import java.util.UUID;
 import android.content.ComponentName;
+import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.Window;
@@ -43,7 +45,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final String className = "biz.playr.MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
-	private boolean callbackSet = false;
+	private ServiceConnection serviceConnection = null;
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean webViewWasLaunched = false;
@@ -124,6 +126,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				CustomTabsClient.bindCustomTabsService(this, chromePackage, this.twaServiceConnection);
 			}
 		} else {
+			// fall back to WebView
 			webView = (WebView) findViewById(R.id.mainUiView);
 			Log.i(className, ".onCreate; webView is " + (webView == null ? "null" : "not null"));
 			setupWebView(webView);
@@ -134,6 +137,28 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				webView.loadDataWithBaseURL("file:///android_asset/",
 						initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
 			}
+
+			// Callbacks for service binding, passed to bindService()
+			serviceConnection = new ServiceConnection() {
+				private static final String className = "ServiceConnection";
+
+				@Override
+				public void onServiceConnected(ComponentName componentName, IBinder service) {
+					Log.i(className, "override onServiceConnected");
+					// cast the IBinder and get CheckRestartService instance
+					biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+					checkRestartService = binder.getService();
+					bound = true;
+					checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+					Log.i(className, ".onServiceConnected: service bound");
+				}
+
+				@Override
+				public void onServiceDisconnected(ComponentName componentName) {
+					Log.i(className, "override onServiceDisconnected");
+					bound = false;
+				}
+			};
 		}
 	}
 
@@ -455,10 +480,19 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// bind to CheckRestartService
 			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
 			bindService(intent, this.twaServiceConnection, Context.BIND_AUTO_CREATE);
-			Log.i(className, "onStart: service bound (auto create)");
+			// checkRestartService = TODO how do we point this attribute to the service instance
+			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
+			bound = true;
+		} else if (this.webView != null) {
+			if (this.checkRestartService == null) {
+				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
+			}
+			Intent intent = new Intent(this, CheckRestartService.class);
+			bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
 			bound = true;
 		} else {
-			Log.i(className, "onStart: twaServiceConnection is null; restart service not bound");
+			Log.e(className, "onStart: twaServiceConnection and webView are null; restart service not bound");
 		}
 	}
 
@@ -480,15 +514,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	protected void onStop() {
 		Log.i(className, "override onStop");
-		if (callbackSet) {
+		if (checkRestartService != null) {
 			checkRestartService.setCallbacks(null);
-			callbackSet = false;
+			Log.i(className, "onStop: callbacks set to null on restart service");
 		}
 		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
+				bound = false;
+				Log.i(className, "onStop: TWA service connection was unbound");
+			} else if (webView != null) {
+				unbindService(this.serviceConnection);
+				bound = false;
+				Log.i(className, "onStop: service connection (webView fall back) was unbound");
 			}
-			bound = false;
 		}
 		// The application is pushed into the background
 		// This method is also called when the device is turned (portrait/landscape
@@ -533,12 +572,28 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// 1) configure onDestroy not to be called when the screen is rotated
 		// 2) calling restartDelayed() here
 		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
-		Log.i(className,".onDestroy: Delayed restart of the application !!!");
-		restartDelayed();
-		if (this.bound) {
+
+		// restart is turned off for now since the restarts can trigger a recurring restart
+		// the option to auto reboot a player when it is detected to not play should be
+		// sufficient to keep players active
+		// Log.i(className,".onDestroy: Delayed restart of the application !!!");
+		// restartDelayed();
+
+		// the onStop method should have set callbacks to null already, but just to be sure
+		if (checkRestartService != null) {
+			checkRestartService.setCallbacks(null);
+			Log.i(className, "onStop: callbacks set to null on restart service");
+		}
+		// the onStop method should have unboumd the service already, but just to be sure
+		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
-				this.bound = false;
+				bound = false;
+				Log.i(className, "onStop: TWA service connection was unbound");
+			} else if (webView != null) {
+				unbindService(this.serviceConnection);
+				bound = false;
+				Log.i(className, "onStop: service connection (webView fall back) was unbound");
 			}
 		}
 		super.onDestroy();
