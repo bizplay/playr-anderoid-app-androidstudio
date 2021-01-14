@@ -19,6 +19,11 @@ public class BootUpReceiver extends BroadcastReceiver{
 			/*
 			 * The Intent is kept in synch with the Manifest and DefaultExceptionhandler
 			 */
+			// both these variants should work
+            // Intent activityIntent =  context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+			// activityIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+			//		| Intent.FLAG_ACTIVITY_CLEAR_TASK
+			//		| Intent.FLAG_ACTIVITY_NEW_TASK);
 			Intent activityIntent = new Intent(context, MainActivity.class);
 			activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 					| Intent.FLAG_ACTIVITY_CLEAR_TASK

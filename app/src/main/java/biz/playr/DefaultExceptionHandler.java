@@ -16,7 +16,7 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 	// time a user has when changing a setting or using any other app
 	// since that will trigger a restart in the MainActivity that uses
 	// the same restartDelay
-	static final long restartDelay = 60000; // 60 seconds in milliseconds
+	static final long restartDelay = 30000; // 30 seconds in milliseconds
 	private Activity activity;
 	private Thread.UncaughtExceptionHandler defaultUEH;
 

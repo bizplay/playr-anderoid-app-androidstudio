@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.Window;
@@ -52,6 +53,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private boolean twaWasLaunched = false;
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
+	private static final int REQUEST_OVERLAY_PERMISSION = 1;
 
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
@@ -100,6 +102,22 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		setContentView(R.layout.activity_main);
 
 		String playerId = retrieveOrGeneratePlayerId();
+
+		// on Android 10 and later getting the app to start up uses an overlay
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			requestManageOverlayPermission(getApplicationContext());
+//			if (!Settings.canDrawOverlays(getApplicationContext())) {
+//				Intent myIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+//				Uri uri = Uri.fromParts("package", getPackageName(), null);
+//
+//				myIntent.setData(uri);
+//				startActivityForResult(myIntent, REQUEST_OVERLAY_PERMISSIONS);
+//			}
+
+//			if (!Settings.canDrawOverlays(getApplicationContext())) {
+//				startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+//			}
+		}
 
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
@@ -159,6 +177,30 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 					bound = false;
 				}
 			};
+		}
+	}
+
+	private void requestManageOverlayPermission(Context context) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+			if (!Settings.canDrawOverlays(context)) {
+				Log.i(className, ".requestManageOverlayPermission: requesting overlay permission");
+				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+											Uri.parse("package:" + getPackageName()));
+				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
+			}
+		}
+	}
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data)
+	{
+		Log.i(className, "override onActivityResult");
+		if (resultCode == Activity.RESULT_CANCELED) {
+			Log.i(className, ".onActivityResult: cancelled");
+			// code to handle cancelled state
+		}
+		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+			Log.i(className, ".onActivityResult: overlay permission");
+			// code to handle REQUEST_OVERLAY_PERMISSION case
 		}
 	}
 
@@ -365,7 +407,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	public void handleUncaughtException(Thread paramThread,
-			Throwable paramThrowable) {
+		Throwable paramThrowable) {
 		Log.e(className, "handleUncaughtException; paramThread: " + paramThread
 				+ ", paramThrowable: " + paramThrowable);
 		// restartActivity();
@@ -390,7 +432,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		if (mgr != null) {
 			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
-			mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+			} else {
+				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+			}
 		}
 		Log.i(className, "restartDelayed: end");
 	}
@@ -577,27 +625,27 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// 2) calling restartDelayed() here
 		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
 
-		// restart is turned off for now since the restarts can trigger a recurring restart
-		// the option to auto reboot a player when it is detected to not play should be
-		// sufficient to keep players active
-		// Log.i(className,".onDestroy: Delayed restart of the application !!!");
-		// restartDelayed();
+		// ! restart is turned off for now since the restarts can trigger a recurring restart
+		// ! the option to auto reboot a player when it is detected to not play should be
+		// ! sufficient to keep players active
+		 Log.i(className,".onDestroy: Delayed restart of the application !!!");
+		 restartDelayed();
 
 		// the onStop method should have set callbacks to null already, but just to be sure
 		if (checkRestartService != null) {
 			checkRestartService.setCallbacks(null);
-			Log.i(className, "onStop: callbacks set to null on restart service");
+			Log.i(className, "onDestroy: callbacks set to null on restart service");
 		}
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
 				bound = false;
-				Log.i(className, "onStop: TWA service connection was unbound");
+				Log.i(className, "onDestroy: TWA service connection was unbound");
 			} else if (webView != null) {
 				unbindService(this.serviceConnection);
 				bound = false;
-				Log.i(className, "onStop: service connection (webView fall back) was unbound");
+				Log.i(className, "onDestroy: service connection (webView fall back) was unbound");
 			}
 		}
 		super.onDestroy();
