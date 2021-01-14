@@ -6,7 +6,7 @@ import android.content.Intent;
 import android.util.Log;
 
 public class BootUpReceiver extends BroadcastReceiver{
-	private String className = "BootUpReceiver";
+	private static final String className = "bz.playr.BootUpReceiver";
 	/* this class is used to force a restart of the MainActivity after the device is rebooted
 	 * for instance when Android has updated
 	 * see the <receiver> section of the AndroidManifest file
@@ -26,8 +26,8 @@ public class BootUpReceiver extends BroadcastReceiver{
 			activityIntent.setAction(Intent.ACTION_MAIN);
 			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 			context.startActivity(activityIntent);
-			Log.i(className, "service started");
+			Log.i(className, ".onReceive service started");
 		}
-		Log.i(className, "onReceive: end");
+		Log.i(className, ".onReceive: end");
 	}
 }

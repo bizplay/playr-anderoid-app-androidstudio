@@ -3,8 +3,8 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "2.1.8",
-        versionCode: 27,
+        versionName: "2.2.0",
+        versionCode: 28,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -41,6 +41,9 @@ android {
 
         // The name for the application on the Android Launcher
         resValue "string", "appName", appManifest.name
+
+        // The name for the application on the Android Launcher
+        resValue "string", "versionName", appManifest.versionName
 
         // The URL that will be used when launching the TWA from the Android Launcher
         def launchUrl = "http://" + twaManifest.hostName + twaManifest.launchUrl + "?app_version=" + appManifest.versionName
