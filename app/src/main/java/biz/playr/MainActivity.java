@@ -1,6 +1,8 @@
 package biz.playr;
 
 import java.util.UUID;
+
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.ServiceConnection;
 import android.net.Uri;
@@ -32,6 +34,8 @@ import android.webkit.WebResourceError;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
@@ -39,6 +43,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
+import androidx.core.app.ActivityCompat;
 import androidx.webkit.WebViewCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
@@ -190,17 +195,30 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 		}
 	}
+
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data)
 	{
 		Log.i(className, "override onActivityResult");
 		if (resultCode == Activity.RESULT_CANCELED) {
-			Log.i(className, ".onActivityResult: cancelled");
+			Log.i(className, ".onActivityResult: RESULT_CANCELED - activity was cancelled, resultCode: " + resultCode);
 			// code to handle cancelled state
 		}
 		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-			Log.i(className, ".onActivityResult: overlay permission");
+			Log.i(className, ".onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
 			// code to handle REQUEST_OVERLAY_PERMISSION case
+		}
+	}
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+		if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+			if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				Log.i(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! permission: " + permissions[0]);
+			} else {
+				// Permission request was denied.
+				Log.e(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
+			}
+		} else {
+			// nothing currently
 		}
 	}
 
