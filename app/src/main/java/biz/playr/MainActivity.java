@@ -3,8 +3,10 @@ package biz.playr;
 import java.util.UUID;
 
 import android.Manifest;
+import android.app.UiModeManager;
 import android.content.ComponentName;
 import android.content.ServiceConnection;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -12,6 +14,7 @@ import android.os.IBinder;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.annotation.SuppressLint;
@@ -37,6 +40,7 @@ import android.webkit.WebViewClient;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -54,7 +58,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private ServiceConnection serviceConnection = null;
 	// TWA related
 	private boolean chromeVersionChecked = false;
-	private boolean webViewWasLaunched = false;
 	private boolean twaWasLaunched = false;
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
@@ -186,7 +189,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void requestManageOverlayPermission(Context context) {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isAndroidTV()) {
 			if (!Settings.canDrawOverlays(context)) {
 				Log.i(className, ".requestManageOverlayPermission: requesting overlay permission");
 				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -194,6 +197,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
 			}
 		}
+	}
+
+	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+	private boolean isAndroidTV() {
+		UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+		return uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
 	}
 
 	@Override
@@ -247,7 +256,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-				Log.i(className, "override onConsoleMessage");
+//				Log.i(className, "override onConsoleMessage");
 				// Log.i(className,"override onConsoleMessage: " +
 				// consoleMessage.message());
 				// count++;
@@ -282,9 +291,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			 */
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-				Log.i(className, "override onReceivedError");
+				// Log.i(className, "override onReceivedError");
 				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
-				Log.e(className, "WebView(Client) error: " + description + " code: " + String.valueOf(errorCode) + " URL: " + failingUrl);
+				Log.e(className, ".onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
 				if ("net::".equals(description.subSequence(0,5))) {
 					// ignore network errors
 				} else {
@@ -299,11 +308,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			 */
 			@Override
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-				Log.i(className, "override onReceivedError");
+				// Log.i(className, "override onReceivedError");
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
-					Log.e(className, "onReceivedError WebView error: " + error.getDescription()
-							+ " code: " + String.valueOf(error.getErrorCode()) + " URL: " + request.getUrl().toString());
+					Log.e(className, ".onReceivedError: WebView error - " + error.getDescription()
+							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
 				}
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 					if ("net::".equals(error.getDescription().subSequence(0,5))) {
@@ -452,10 +461,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
 			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, "restartDelayed: called setExact");
 			} else {
 				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, "restartDelayed: called set");
 			}
 		}
 		Log.i(className, "restartDelayed: end");
@@ -502,7 +514,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
+		// When navigating back, content is not revalidated, instead the content is just retrieved
+		// from the cache. This method allows the client to override this behavior
 		webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 	}
 
@@ -609,6 +624,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// and: https://stackoverflow.com/questions/4843809/how-do-i-detect-screen-rotation
 		// restartDelayed();
 		super.onStop();
+		Log.i(className, "onStop: end");
 	}
 
 	@Override
@@ -646,27 +662,73 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// ! restart is turned off for now since the restarts can trigger a recurring restart
 		// ! the option to auto reboot a player when it is detected to not play should be
 		// ! sufficient to keep players active
-		 Log.i(className,".onDestroy: Delayed restart of the application !!!");
+		 Log.i(className,".onDestroy: Delayed restart of the application!!!");
 		 restartDelayed();
 
 		// the onStop method should have set callbacks to null already, but just to be sure
 		if (checkRestartService != null) {
 			checkRestartService.setCallbacks(null);
-			Log.i(className, "onDestroy: callbacks set to null on restart service");
+			Log.i(className, ".onDestroy: callbacks set to null on restart service");
 		}
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
 				bound = false;
-				Log.i(className, "onDestroy: TWA service connection was unbound");
+				Log.i(className, ".onDestroy: TWA service connection was unbound");
 			} else if (webView != null) {
 				unbindService(this.serviceConnection);
 				bound = false;
-				Log.i(className, "onDestroy: service connection (webView fall back) was unbound");
+				Log.i(className, ".onDestroy: service connection (webView fall back) was unbound");
 			}
+		} else {
+			Log.i(className, ".onDestroy: connection is unbound");
+		}
+		if (webView != null) {
+			destroyWebView(webView);
+			webView = null;
 		}
 		super.onDestroy();
+		Log.i(className, ".onDestroy: end");
+	}
+
+	private void destroyWebView(WebView webView) {
+		ViewGroup viewGroup;
+
+		if (webView != null) {
+			viewGroup = (ViewGroup) webView.getParent();
+			if (viewGroup != null)
+			{
+				Log.i(className, ".destroyWebView: removeView()");
+				// viewGroup.removeAllViews();
+				viewGroup.removeView(webView);
+			}
+
+			Log.i(className, ".destroyWebView: prepare webView.destroy()");
+			webView.clearHistory();
+
+			// NOTE: clears RAM cache, if you pass true, it will also clear the disk cache.
+			webView.clearCache(false);
+
+			// Loading a blank page is optional, but will ensure that the WebView isn't doing anything when you destroy it.
+			webView.loadUrl("about:blank");
+
+			webView.onPause();
+			webView.removeAllViews();
+			webView.destroyDrawingCache();
+
+			// NOTE: This pauses JavaScript execution for ALL WebViews,
+			// do not use if you have other WebViews still alive.
+			// If you create another WebView after calling this,
+			// make sure to call mWebView.resumeTimers().
+			webView.pauseTimers();
+
+			webView.removeAllViews();
+
+			// NOTE: This can occasionally cause a segfault below API 17 (4.2)
+			Log.i(className, ".destroyWebView: webView.destroy()");
+			webView.destroy();
+		}
 	}
 
 	@SuppressLint("InlinedApi")
