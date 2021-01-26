@@ -2,56 +2,56 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="biz.playr" >
 
-	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
-	<uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-	<uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-	<!--<uses-feature android:name="android.hardware.camera" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.camera.any" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.consumerir" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.location" android:required="false" />-->
+	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false"/>
+	<uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+	<uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+	<!--<uses-feature android:name="android.hardware.camera" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.camera.any" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.consumerir" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.location" android:required="false"/>-->
 	<!--<uses-feature android:name="android.hardware.location.gps" android:required="false"/>-->
-	<!--<uses-feature android:name="android.hardware.microphone" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.nfc" android:required="false" />-->
+	<!--<uses-feature android:name="android.hardware.microphone" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.nfc" android:required="false"/>-->
 	<uses-feature android:name="android.hardware.sensor" android:required="false"/>
-	<!--<uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.barometer" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.compass" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.light" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />-->
-	<!--<uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />-->
-	<uses-feature android:name="android.hardware.telephony" android:required="false" />
-	<uses-feature android:name="android.hardware.faketouch" android:required="false" />
-	<uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+	<!--<uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.barometer" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.compass" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.light" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.proximity" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false"/>-->
+	<!--<uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false"/>-->
+	<uses-feature android:name="android.hardware.telephony" android:required="false"/>
+	<uses-feature android:name="android.hardware.faketouch" android:required="false"/>
+	<uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
 	<uses-feature android:name="android.hardware.gamepad" android:required="false"/>
-	<uses-feature android:name="android.hardware.usb.host" android:required="false" />
-	<uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
-	<!--<uses-feature android:name="android.hardware.wifi.direct" android:required="false" />-->
-	<uses-feature android:name="android.software.leanback" android:required="false" />
+	<uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+	<uses-feature android:name="android.hardware.usb.accessory" android:required="false"/>
+	<!--<uses-feature android:name="android.hardware.wifi.direct" android:required="false"/>-->
+	<uses-feature android:name="android.software.leanback" android:required="false"/>
 
-	<uses-permission android:name="android.hardware.screen.landscape" android:required="false" />
-	<uses-permission android:name="android.hardware.screen.portrait" android:required="false" />
-	<!--<uses-permission android:name="android.hardware.television" android:required="false" />-->
-	<uses-permission android:name="android.hardware.wifi" />
+	<uses-permission android:name="android.hardware.screen.landscape" android:required="false"/>
+	<uses-permission android:name="android.hardware.screen.portrait" android:required="false"/>
+	<!--<uses-permission android:name="android.hardware.television" android:required="false"/>-->
+	<uses-permission android:name="android.hardware.wifi"/>
 
-	<!--<uses-permission android:name="android.software.app_widget" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.device_admin" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.home_screen" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.input_methods" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.live_wallpaper" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.sip" android:required="false" />-->
-	<!--<uses-permission android:name="android.software.sip.voip" android:required="false" />-->
-	<uses-permission android:name="android.permission.INTERNET" />
-	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-	<!--<uses-permission android:name="android.permission.GET_TASKS" />-->
+	<!--<uses-permission android:name="android.software.app_widget" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.device_admin" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.home_screen" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.input_methods" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.live_wallpaper" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.sip" android:required="false"/>-->
+	<!--<uses-permission android:name="android.software.sip.voip" android:required="false"/>-->
+	<uses-permission android:name="android.permission.INTERNET"/>
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+	<!--<uses-permission android:name="android.permission.GET_TASKS"/>-->
 	<!-- WAKE_LOCK is used by the media player inside WebView/Chromium -->
-	<uses-permission android:name="android.permission.WAKE_LOCK" />
+	<uses-permission android:name="android.permission.WAKE_LOCK"/>
 	<!-- Manage overlay permission, needed for restart on API Q and newer -->
-	<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION" />
-	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+	<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION"/>
+	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
@@ -66,7 +66,7 @@
 		android:networkSecurityConfig="@xml/network_security_config"
 		android:theme="@style/AppTheme" >
 		<!-- as alternative to singleInstance
-		<activity android:launchMode = "singleTask" />
+		<activity android:launchMode = "singleTask"/>
 		-->
 		<!-- To test TWA on a device and have Chrome skip the validation of the assetlinks.json file
 			pull the chrome-command-line file from the device (or create it when it is not present):
@@ -87,10 +87,10 @@
 		-->
 		<meta-data
 			android:name="asset_statements"
-			android:resource="@string/assetStatements" />
+			android:resource="@string/assetStatements"/>
 		<meta-data
 			android:name="cros_web_alternative"
-			android:value="@string/crosLaunchUrl" />
+			android:value="@string/crosLaunchUrl"/>
 		<activity
 			android:name="biz.playr.MainActivity"
 			android:hardwareAccelerated="true"
@@ -100,29 +100,31 @@
 			<!-- for TWA -->
 			<!--<intent-filter android:autoVerify="true">-->
 			<intent-filter>
-				<action android:name="android.intent.action.MAIN" />
-				<action android:name="android.intent.action.VIEW" />
-				<category android:name="android.intent.category.BROWSABLE" />
+				<action android:name="android.intent.action.MAIN"/>
+				<action android:name="android.intent.action.VIEW"/>
+				<category android:name="android.intent.category.BROWSABLE"/>
 				<!-- for non TV devices -->
-				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.LAUNCHER"/>
 				<!-- for non AndroidTV devices -->
-				<category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
+				<category android:name="android.intent.category.DEFAULT"/>
+				<data android:scheme="http" android:host="*.playr.biz"/>
+				<data android:scheme="https"/>
 				<!-- for TWA -->
-				<!--<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>-->
-				<!--<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>-->
-				<!--<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>-->
-				<!--<category android:name="androidx.browser.trusted.category.ImmersiveMode" />-->
-				<!--<data android:scheme="http" android:host="play.playr.biz" />-->
-				<!--<data android:scheme="https" />-->
+				<!--
+				<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>
+				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
+				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
+				<category android:name="androidx.browser.trusted.category.ImmersiveMode"/>
+				-->
 			</intent-filter>
 		</activity>
-		<service android:name="biz.playr.CheckRestartService" android:enabled="true" />
+		<service android:name="biz.playr.CheckRestartService" android:enabled="true"/>
 		<!--
-		<service android:name="biz.playr.PlayrService" />
+		<service android:name="biz.playr.PlayrService"/>
 		 -->
 		<!--
-		<service android:name="biz.playr.PersistService" android:enabled="true" />
+		<service android:name="biz.playr.PersistService" android:enabled="true"/>
 		 -->
 		<receiver
 			android:name="biz.playr.BootUpReceiver"
@@ -131,13 +133,13 @@
 			android:exported="true"
 			android:permission="android.permission.RECEIVE_BOOT_COMPLETED" >
 			<intent-filter>
-				<category android:name="android.intent.category.DEFAULT" />
-				<action android:name="android.intent.action.BOOT_COMPLETED" />
-				<action android:name="android.intent.action.ACTION_BOOT_COMPLETED" />
-				<action android:name="android.intent.action.QUICKBOOT_POWERON" />
-				<action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-				<action android:name="android.intent.action.REBOOT" />
-				<action android:name="android.intent.action.ACTION_REBOOT" />
+				<category android:name="android.intent.category.DEFAULT"/>
+				<action android:name="android.intent.action.BOOT_COMPLETED"/>
+				<action android:name="android.intent.action.ACTION_BOOT_COMPLETED"/>
+				<action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+				<action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+				<action android:name="android.intent.action.REBOOT"/>
+				<action android:name="android.intent.action.ACTION_REBOOT"/>
 			</intent-filter>
 		</receiver>
 	</application>
