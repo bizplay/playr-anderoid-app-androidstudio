@@ -119,8 +119,17 @@
 				-->
 			</intent-filter>
 		</activity>
-		<service android:name="biz.playr.CheckRestartService" android:enabled="true"/>
-		<!--
+		<service
+			android:name="biz.playr.CheckRestartService"
+			android:process=":biz.playr.CheckRestartService"
+			android:enabled="true" />
+		<!--<service
+			android:name="biz.playr.CheckRestartService"
+			android:enabled="true"
+			android:persistent="true"
+			android:isolatedProcess="true"
+			android:process=":biz.playr.CheckRestartService"/>
+
 		<service android:name="biz.playr.PlayrService"/>
 		 -->
 		<!--
