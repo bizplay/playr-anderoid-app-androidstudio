@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -72,6 +73,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
 
+	private int rotationStateOnCreate = Configuration.ORIENTATION_UNDEFINED;
+	private int rotationStateOnSafeInstanceState = Configuration.ORIENTATION_UNDEFINED;
+
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
 
@@ -79,6 +83,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onCreate(Bundle savedInstanceState) {
 		Log.i(className, "override onCreate");
 		super.onCreate(savedInstanceState);
+
+		// retrieve and store initial screen orientation
+		DisplayMetrics displayMetrics = new DisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+		Log.e(className, "\n\n\noverride onCreate - width: " + displayMetrics.widthPixels + ", height:" + displayMetrics.heightPixels + "\n\n\n");
+		rotationStateOnCreate = displayMetrics.heightPixels/displayMetrics.widthPixels > 1 ? Configuration.ORIENTATION_PORTRAIT : Configuration.ORIENTATION_LANDSCAPE;
 
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setup restarting of app on crash");
@@ -297,6 +307,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
 		Log.i(className, "override onSaveInstanceState");
+
+		// retrieve and store screen orientation after application close (potential change in orientation)
+		// TODO check if the delayed restart is used after this so we can use this information to decide whether to restart or not
+		DisplayMetrics displayMetrics = new DisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+		Log.e(className, "\n\n\noverride onSaveInstanceState - width: " + displayMetrics.widthPixels + ", height:" + displayMetrics.heightPixels + "\n\n\n");
+		rotationStateOnSafeInstanceState = displayMetrics.heightPixels/displayMetrics.widthPixels > 1 ? Configuration.ORIENTATION_PORTRAIT : Configuration.ORIENTATION_LANDSCAPE;
+
 		super.onSaveInstanceState(outState);
 		if (webView != null) { webView.saveState(outState); }
 		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
