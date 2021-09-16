@@ -130,71 +130,367 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		}
 
 		// create Trusted Web Access or fall back to a WebView
-//		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		openBrowserView((savedInstanceState == null),
 						(savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
 						retrieveOrGeneratePlayerId());
-//		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
-//		// * URL bar stays visible
-//		// * button bar stays visible
-//		// * video's with sound do not play even though they do in Chrome (whn playing the same channel)
-//		if (false) {
-////		if (chromePackage != null) {
-//			Log.i(className, ".onCreate chromePackage is not null");
-//			if (!chromeVersionChecked) {
-//				Log.i(className, ".onCreate !chromeVersionChecked");
-//				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
-//				chromeVersionChecked = true;
-//			}
-//
-//			this.twaServiceConnection = openTWAView(savedInstanceState, chromePackage);
-////			if (savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)) {
-////				Log.i(className, ".onCreate TWA was launched => finish");
-////				this.finish();
-////			} else {
-////				Log.i(className, ".onCreate launching TWA");
-////				this.twaServiceConnection = new MainActivity.TwaCustomTabsServiceConnection();
-//////				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
-////				CustomTabsClient.bindCustomTabsService(this, chromePackage, this.twaServiceConnection);
-////			}
-//		} else {
-//			// fall back to WebView
-//			webView = openWebView(savedInstanceState, playerId);
-////			webView = (WebView) findViewById(R.id.mainUiView);
-////			Log.i(className, ".onCreate; webView is " + (webView == null ? "null" : "not null"));
-////			setupWebView(webView);
-////			webView.setWebChromeClient(createWebChromeClient());
-////			webView.setWebViewClient(createWebViewClient());
-////			webView.setKeepScreenOn(true);
-////			if (savedInstanceState == null) {
-////				webView.loadDataWithBaseURL("file:///android_asset/",
-////						initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
-////			}
-////
-////			// Callbacks for service binding, passed to bindService()
-////			serviceConnection = new ServiceConnection() {
-////				private static final String className = "ServiceConnection";
-////
-////				@Override
-////				public void onServiceConnected(ComponentName componentName, IBinder service) {
-////					Log.i(className, "override onServiceConnected");
-////					// cast the IBinder and get CheckRestartService instance
-////					biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-////					checkRestartService = binder.getService();
-////					bound = true;
-////					checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-////					Log.i(className, ".onServiceConnected: service bound");
-////				}
-////
-////				@Override
-////				public void onServiceDisconnected(ComponentName componentName) {
-////					Log.i(className, "override onServiceDisconnected");
-////					bound = false;
-////				}
-////			};
-//		}
 	}
 
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data)
+	{
+		Log.i(className, "override onActivityResult");
+		if (resultCode == Activity.RESULT_CANCELED) {
+			Log.i(className, ".onActivityResult: RESULT_CANCELED - activity was cancelled, resultCode: " + resultCode);
+			// code to handle cancelled state
+		}
+		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+			Log.i(className, ".onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
+			// code to handle REQUEST_OVERLAY_PERMISSION case
+		}
+	}
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+		if (requestCode == REQUEST_OVERLAY_PERMISSION) {
+			if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				Log.i(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! permission: " + permissions[0]);
+			} else {
+				// Permission request was denied.
+				Log.e(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
+			}
+		} else {
+			// nothing currently
+		}
+	}
+
+	protected CustomTabsSession getSession(CustomTabsClient client) {
+		return client.newSession((CustomTabsCallback)null, SESSION_ID);
+	}
+
+    protected CustomTabsIntent getCustomTabsIntent(CustomTabsSession session) {
+        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(session);
+        return builder.build();
+    }
+
+	public void handleUncaughtException(Thread paramThread,
+		Throwable paramThrowable) {
+		Log.e(className, ".handleUncaughtException; paramThread: " + paramThread
+				+ ", paramThrowable: " + paramThrowable);
+		// restartActivity();
+		recreate();
+	}
+
+	public void restartDelayed() {
+		Log.i(className, ".restartDelayed");
+
+		// the context of the activityIntent might need to be the running PlayrService
+		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
+//		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
+		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
+		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+				| Intent.FLAG_ACTIVITY_CLEAR_TASK
+				| Intent.FLAG_ACTIVITY_NEW_TASK);
+		activityIntent.setAction(Intent.ACTION_MAIN);
+		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
+		// delay start so this activity can be ended before the new one starts
+		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
+		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+		if (mgr != null) {
+			Log.i(className, ".restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, ".restartDelayed: called setExactAndAllowWhileIdle");
+			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, ".restartDelayed: called setExact");
+			} else {
+				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+				Log.i(className, ".restartDelayed: called set");
+			}
+		}
+		Log.i(className, ".restartDelayed: end");
+	}
+
+	// implement the ComponentCallbacks2 interface
+	/**
+	 * Release memory when the UI becomes hidden or when system resources become low.
+	 * @param level the memory-related event that was raised.
+	 */
+	public void onTrimMemory(int level) {
+		Log.i(className, ".onTrimMemory");
+
+		Log.w(className, ".onTrimMemory - level: " + level);
+		// Determine which lifecycle or system event was raised.
+		switch (level) {
+			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
+			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
+			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
+                // Release as much memory as the process can.
+				//
+                // The app is on the LRU list and the system is running low on memory.
+                // The event raised indicates where the app sits within the LRU list.
+                // If the event is TRIM_MEMORY_COMPLETE, the process will be one of
+                // the first to be terminated.
+				// ==>> restart the application
+				this.restartActivity();
+				break;
+			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+				// Release any UI objects that currently hold memory.
+				// The user interface has moved to the background.
+				// ==>> dump browser view and recreate it
+				this.recreateBrowserView();
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
+				// Release any memory that your app doesn't need to run.
+				//
+				// The device is running low on memory while the app is running.
+				// The event raised indicates the severity of the memory-related event.
+				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
+				// begin killing background processes.
+				// ==>> reload browser view
+			default:
+                // Release any non-critical data structures.
+				//
+                // The app received an unrecognized memory level value
+                // from the system. Treat this as a generic low-memory message.
+				// ==>> reload browser view
+				this.reloadBrowserView();
+				break;
+		}
+	}
+	// end of implementation ComponentCallbacks2
+
+	// implement the IServiceCallbacks interface
+	public void restartActivityWithDelay() {
+		this.restartActivity();
+	}
+
+	public String getPlayerId() {
+		return getStoredPlayerId();
+	}
+	// end of implementation IServiceCallbacks
+
+	public void restartActivity() {
+		Log.i(className, "restartActivity: setting up delayed restart");
+		restartDelayed();
+		Log.i(className, "restartActivity: killing this process");
+		setResult(RESULT_OK);
+		Log.i(className, "restartActivity: calling finish()");
+		finish();
+//		Log.i(className, "restartActivity: calling killProcess()");
+//		android.os.Process.killProcess(android.os.Process.myPid());
+//		Log.i(className, "restartActivity: calling exit(2)");
+//		System.exit(2);
+	}
+
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		Log.i(className, "override onSaveInstanceState");
+		super.onSaveInstanceState(outState);
+		if (webView != null) { webView.saveState(outState); }
+		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
+	}
+
+	@Override
+	protected void onRestoreInstanceState(Bundle savedInstanceState) {
+		Log.i(className, "override onRestoreInstanceState");
+		super.onRestoreInstanceState(savedInstanceState);
+		if (savedInstanceState != null && !savedInstanceState.isEmpty()) {
+			if (webView != null) { webView.restoreState(savedInstanceState); }
+			this.twaWasLaunched = savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY);
+		}
+	}
+
+	@Override
+	protected void onResume() {
+		Log.i(className, "override onResume");
+		super.onResume();
+
+		hideBars();
+		if (webView != null) { webView.onResume(); }
+	}
+
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus) {
+		Log.i(className, "override onWindowFocusChanged");
+		super.onWindowFocusChanged(hasFocus);
+		if (hasFocus) {
+			hideBars();
+		}
+	}
+
+	@Override
+	protected void onStart() {
+		Log.i(className, "override onStart");
+		super.onStart();
+		if (this.twaServiceConnection != null) {
+			// bind to CheckRestartService
+			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
+			bindService(intent, this.twaServiceConnection, Context.BIND_AUTO_CREATE);
+			// checkRestartService = TODO how do we point this attribute to the service instance
+			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
+			bound = true;
+		} else if (this.webView != null) {
+			if (this.checkRestartService == null) {
+				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
+			}
+			Intent intent = new Intent(this, CheckRestartService.class);
+			bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
+			bound = true;
+		} else {
+			Log.e(className, "onStart: twaServiceConnection and webView are null; restart service not bound");
+		}
+	}
+
+	@Override
+	protected void onRestart() {
+		Log.i(className, "override onRestart");
+		super.onRestart();
+		if (this.twaWasLaunched) {
+			this.finish();
+		}
+	}
+
+	@Override
+	protected void onPause() {
+		Log.i(className, "override onPause");
+		if (webView != null) { webView.onPause(); }
+		super.onPause();
+	}
+
+	protected void onStop() {
+		Log.i(className, "override onStop");
+		if (checkRestartService != null) {
+			checkRestartService.setCallbacks(null);
+			Log.i(className, "onStop: callbacks set to null on restart service");
+		}
+		this.unBindServiceConnection();
+		// The application is pushed into the background
+		// This method is also called when the device is turned (portrait/landscape
+		// switch) and will result in repeated restart of the app
+		// detecting rotation to prevent unnecessary calls to restartDelayed is
+		// supposed to be complex and may require logic that spans onStop and onCreate
+		// since these are called by the Android system when the screen is rotated
+		// see: https://stackoverflow.com/questions/6896243/how-can-i-detect-screen-rotation
+		// and: https://stackoverflow.com/questions/4843809/how-do-i-detect-screen-rotation
+		// restartDelayed();
+		super.onStop();
+		Log.i(className, "onStop: end");
+	}
+
+	private void unBindServiceConnection() {
+		if (bound) {
+			if (this.twaServiceConnection != null) {
+				unbindService(this.twaServiceConnection);
+				bound = false;
+				Log.i(className, "unBindServiceConnection: TWA service connection was unbound");
+			} else if (webView != null) {
+				unbindService(this.serviceConnection);
+				bound = false;
+				Log.i(className, "unBindServiceConnection: service connection (webView fall back) was unbound");
+			}
+		}
+	}
+
+	@Override
+	protected void onDestroy() {
+		Log.i(className, "override onDestroy");
+
+		// since onDestroy is called when the device changes aspect ratio
+		// (which is possible on tablets) this method cannot be used to force
+		// a restart of the application when this method is called.
+		// Having this logic here causes a restart loop when the device changes
+		// aspect the ratio.
+		// Log.e(className, "onDestroy: Prepare to restart the app.");
+		// Intent intent = new Intent(this, biz.playr.MainActivity.class);
+		//
+		// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+		// | Intent.FLAG_ACTIVITY_CLEAR_TASK
+		// | Intent.FLAG_ACTIVITY_NEW_TASK);
+		//
+		// PendingIntent pendingIntent = PendingIntent.getActivity(
+		// biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, intent.getFlags());
+		//
+		// //Following code will restart your application after <delay> seconds
+		// AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
+		// mgr.set(AlarmManager.RTC, System.currentTimeMillis() +
+		// DefaultExceptionHandler.restartDelay, pendingIntent);
+		//
+
+		// TODO: properly handling the delayed restart can only be done by letting the system handle less onDestroy events:
+		// see: https://developer.android.com/guide/topics/resources/runtime-changes#java
+		// this would mean:
+		// 1) configure onDestroy not to be called when the screen is rotated
+		// 2) calling restartDelayed() here
+		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
+
+		// ! restart is turned off for now since the restarts can trigger a recurring restart
+		// ! the option to auto reboot a player when it is detected to not play should be
+		// ! sufficient to keep players active
+		 Log.i(className,"onDestroy: Delayed restart of the application!!!");
+		 restartDelayed();
+
+		// the onStop method should have set callbacks to null already, but just to be sure
+		if (checkRestartService != null) {
+			checkRestartService.setCallbacks(null);
+			Log.i(className, "onDestroy: callbacks set to null on restart service");
+		}
+		// the onStop method should have unbound the service already, but just to be sure
+		if (bound) {
+			unBindServiceConnection();
+		} else {
+			Log.i(className, "onDestroy: connection is unbound");
+		}
+		this.destroyBrowserView();
+		super.onDestroy();
+		Log.i(className, "onDestroy: end");
+	}
+
+	@SuppressLint("InlinedApi")
+	protected void hideBars() {
+		if (getWindow() != null) {
+			View decorView = getWindow().getDecorView();
+			// Hide both the navigation bar and the status bar.
+			// SYSTEM_UI_FLAG_FULLSCREEN is only available on Android 4.1 and higher, but as
+			// a general rule, you should design your app to hide the status bar whenever you
+			// hide the navigation bar.
+			int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+							| View.SYSTEM_UI_FLAG_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+							| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+							| View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+			// Enables regular immersive mode.
+			// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
+			// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+//					| View.SYSTEM_UI_FLAG_IMMERSIVE;
+			decorView.setSystemUiVisibility(uiOptions);
+		}
+		// Remember that you should never show the action bar if the
+		// status bar is hidden, so hide that too if necessary.
+		ActionBar actionBar = getActionBar();
+		if (actionBar != null) {
+			actionBar.hide();
+		}
+	}
+
+	@Override
+	/* Navigate the WebView's history when the user presses the Back key. */
+	public void onBackPressed() {
+		if (webView != null) {
+			if (webView.canGoBack()) {
+				webView.goBack();
+			} else {
+				super.onBackPressed();
+			}
+		} else {
+			super.onBackPressed();
+		}
+	}
+
+	/*
+	 * PRIVATE methods
+	 */
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
@@ -274,7 +570,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			if (!Settings.canDrawOverlays(context)) {
 				Log.i(className, ".requestManageOverlayPermission: requesting overlay permission");
 				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-											Uri.parse("package:" + getPackageName()));
+						Uri.parse("package:" + getPackageName()));
 				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
 			}
 		}
@@ -284,32 +580,6 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private boolean isAndroidTV() {
 		UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
 		return uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
-	}
-
-	@Override
-	public void onActivityResult(int requestCode, int resultCode, Intent data)
-	{
-		Log.i(className, "override onActivityResult");
-		if (resultCode == Activity.RESULT_CANCELED) {
-			Log.i(className, ".onActivityResult: RESULT_CANCELED - activity was cancelled, resultCode: " + resultCode);
-			// code to handle cancelled state
-		}
-		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-			Log.i(className, ".onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
-			// code to handle REQUEST_OVERLAY_PERMISSION case
-		}
-	}
-	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-		if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-			if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-				Log.i(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! permission: " + permissions[0]);
-			} else {
-				// Permission request was denied.
-				Log.e(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
-			}
-		} else {
-			// nothing currently
-		}
 	}
 
 	private String retrieveOrGeneratePlayerId() {
@@ -489,156 +759,17 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		}
 	}
 
-	protected CustomTabsSession getSession(CustomTabsClient client) {
-		return client.newSession((CustomTabsCallback)null, SESSION_ID);
+	// Get a MemoryInfo object for the device's current memory status.
+	private ActivityManager.MemoryInfo getAvailableMemory() {
+		ActivityManager activityManager = (ActivityManager) this.getSystemService(ACTIVITY_SERVICE);
+		ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
+		activityManager.getMemoryInfo(memoryInfo);
+		return memoryInfo;
 	}
 
-    protected CustomTabsIntent getCustomTabsIntent(CustomTabsSession session) {
-        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(session);
-        return builder.build();
-    }
-
-	private void finishAndRemoveTaskCompat() {
-		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			this.finishAndRemoveTask();
-		} else {
-			this.finish();
-		}
-	}
-
-	private String httpsRequired() {
-		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
-			return "no";
-		} else {
-			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
-		}
-	}
-
-	public void handleUncaughtException(Thread paramThread,
-		Throwable paramThrowable) {
-		Log.e(className, "handleUncaughtException; paramThread: " + paramThread
-				+ ", paramThrowable: " + paramThrowable);
-		// restartActivity();
-		recreate();
-	}
-
-	public void restartDelayed() {
-		Log.i(className, "restartDelayed");
-
-		// the context of the activityIntent might need to be the running PlayrService
-		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
-//		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
-		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
-		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-				| Intent.FLAG_ACTIVITY_CLEAR_TASK
-				| Intent.FLAG_ACTIVITY_NEW_TASK);
-		activityIntent.setAction(Intent.ACTION_MAIN);
-		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
-		// delay start so this activity can be ended before the new one starts
-		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
-		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-		if (mgr != null) {
-			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
-			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExact");
-			} else {
-				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called set");
-			}
-		}
-		Log.i(className, "restartDelayed: end");
-	}
-
-	private void recreateBrowserView() {
-		this.unBindServiceConnection();
-		this.destroyBrowserView();
-		this.openBrowserView(true, false, this.retrieveOrGeneratePlayerId());
-	}
-
-	private void reloadBrowserView() {
-		if (webView != null) {
-			webView.reload();
-		} else if (twaServiceConnection != null) {
-			// TODO reload TWA
-		}
-	}
-
-	// implement the ComponentCallbacks2 interface
-	/**
-	 * Release memory when the UI becomes hidden or when system resources become low.
-	 * @param level the memory-related event that was raised.
-	 */
-	public void onTrimMemory(int level) {
-		Log.i(className, "onTrimMemory");
-
-		Log.w(className, "onTrimMemory - level: " + level);
-		// Determine which lifecycle or system event was raised.
-		switch (level) {
-			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
-			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
-			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-                // Release as much memory as the process can.
-				//
-                // The app is on the LRU list and the system is running low on memory.
-                // The event raised indicates where the app sits within the LRU list.
-                // If the event is TRIM_MEMORY_COMPLETE, the process will be one of
-                // the first to be terminated.
-				// ==>> restart the application
-				this.restartActivity();
-				break;
-			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
-				// Release any UI objects that currently hold memory.
-				// The user interface has moved to the background.
-				// ==>> dump browser view and recreate it
-				this.recreateBrowserView();
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
-				// Release any memory that your app doesn't need to run.
-				//
-				// The device is running low on memory while the app is running.
-				// The event raised indicates the severity of the memory-related event.
-				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
-				// begin killing background processes.
-				// ==>> reload browser view
-			default:
-                // Release any non-critical data structures.
-				//
-                // The app received an unrecognized memory level value
-                // from the system. Treat this as a generic low-memory message.
-				// ==>> reload browser view
-				this.reloadBrowserView();
-				break;
-		}
-	}
-	// end of implementation ComponentCallbacks2
-
-	// implement the IServiceCallbacks interface
-	public void restartActivityWithDelay() {
-		this.restartActivity();
-	}
-
-	public String getPlayerId() {
-		return getStoredPlayerId();
-	}
-	// end of implementation IServiceCallbacks
-
-	public void restartActivity() {
-		Log.i(className, "restartActivity: setting up delayed restart");
-		restartDelayed();
-		Log.i(className, "restartActivity: killing this process");
-		setResult(RESULT_OK);
-		Log.i(className, "restartActivity: calling finish()");
-		finish();
-//		Log.i(className, "restartActivity: calling killProcess()");
-//		android.os.Process.killProcess(android.os.Process.myPid());
-//		Log.i(className, "restartActivity: calling exit(2)");
-//		System.exit(2);
+	private String getStoredPlayerId() {
+		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
+		return sharedPreferences.getString(getString(R.string.player_id_store), "");
 	}
 
 	@SuppressLint("SetJavaScriptEnabled")
@@ -666,168 +797,25 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 	}
 
-	@Override
-	protected void onSaveInstanceState(Bundle outState) {
-		Log.i(className, "override onSaveInstanceState");
-		super.onSaveInstanceState(outState);
-		if (webView != null) { webView.saveState(outState); }
-		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
+	private void storePlayerId(String value) {
+		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
+		SharedPreferences.Editor editor = sharedPreferences.edit();
+		editor.putString(getString(R.string.player_id_store), value);
+		editor.commit();
 	}
 
-	@Override
-	protected void onRestoreInstanceState(Bundle savedInstanceState) {
-		Log.i(className, "override onRestoreInstanceState");
-		super.onRestoreInstanceState(savedInstanceState);
-		if (savedInstanceState != null && !savedInstanceState.isEmpty()) {
-			if (webView != null) { webView.restoreState(savedInstanceState); }
-			this.twaWasLaunched = savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY);
-		}
-	}
-
-	@Override
-	protected void onResume() {
-		Log.i(className, "override onResume");
-		super.onResume();
-
-		hideBars();
-		if (webView != null) { webView.onResume(); }
-	}
-
-	@Override
-	public void onWindowFocusChanged(boolean hasFocus) {
-		Log.i(className, "override onWindowFocusChanged");
-		super.onWindowFocusChanged(hasFocus);
-		if (hasFocus) {
-			hideBars();
-		}
-	}
-
-	@Override
-	protected void onStart() {
-		Log.i(className, "override onStart");
-		super.onStart();
-		if (this.twaServiceConnection != null) {
-			// bind to CheckRestartService
-			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
-			bindService(intent, this.twaServiceConnection, Context.BIND_AUTO_CREATE);
-			// checkRestartService = TODO how do we point this attribute to the service instance
-			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
-			bound = true;
-		} else if (this.webView != null) {
-			if (this.checkRestartService == null) {
-				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
-			}
-			Intent intent = new Intent(this, CheckRestartService.class);
-			bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
-			bound = true;
-		} else {
-			Log.e(className, "onStart: twaServiceConnection and webView are null; restart service not bound");
-		}
-	}
-
-	@Override
-	protected void onRestart() {
-		Log.i(className, "override onRestart");
-		super.onRestart();
-		if (this.twaWasLaunched) {
-			this.finish();
-		}
-	}
-
-	@Override
-	protected void onPause() {
-		Log.i(className, "override onPause");
-		if (webView != null) { webView.onPause(); }
-		super.onPause();
-	}
-
-	protected void onStop() {
-		Log.i(className, "override onStop");
-		if (checkRestartService != null) {
-			checkRestartService.setCallbacks(null);
-			Log.i(className, "onStop: callbacks set to null on restart service");
-		}
+	private void recreateBrowserView() {
 		this.unBindServiceConnection();
-		// The application is pushed into the background
-		// This method is also called when the device is turned (portrait/landscape
-		// switch) and will result in repeated restart of the app
-		// detecting rotation to prevent unnecessary calls to restartDelayed is
-		// supposed to be complex and may require logic that spans onStop and onCreate
-		// since these are called by the Android system when the screen is rotated
-		// see: https://stackoverflow.com/questions/6896243/how-can-i-detect-screen-rotation
-		// and: https://stackoverflow.com/questions/4843809/how-do-i-detect-screen-rotation
-		// restartDelayed();
-		super.onStop();
-		Log.i(className, "onStop: end");
-	}
-
-	private void unBindServiceConnection() {
-		if (bound) {
-			if (this.twaServiceConnection != null) {
-				unbindService(this.twaServiceConnection);
-				bound = false;
-				Log.i(className, ".unBindServiceConnection: TWA service connection was unbound");
-			} else if (webView != null) {
-				unbindService(this.serviceConnection);
-				bound = false;
-				Log.i(className, ".unBindServiceConnection: service connection (webView fall back) was unbound");
-			}
-		}
-	}
-
-	@Override
-	protected void onDestroy() {
-		Log.i(className, "override onDestroy");
-
-		// since onDestroy is called when the device changes aspect ratio
-		// (which is possible on tablets) this method cannot be used to force
-		// a restart of the application when this method is called.
-		// Having this logic here causes a restart loop when the device changes
-		// aspect the ratio.
-		// Log.e(className, ".onDestroy: Prepare to restart the app.");
-		// Intent intent = new Intent(this, biz.playr.MainActivity.class);
-		//
-		// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-		// | Intent.FLAG_ACTIVITY_CLEAR_TASK
-		// | Intent.FLAG_ACTIVITY_NEW_TASK);
-		//
-		// PendingIntent pendingIntent = PendingIntent.getActivity(
-		// biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, intent.getFlags());
-		//
-		// //Following code will restart your application after <delay> seconds
-		// AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
-		// mgr.set(AlarmManager.RTC, System.currentTimeMillis() +
-		// DefaultExceptionHandler.restartDelay, pendingIntent);
-		//
-
-		// TODO: properly handling the delayed restart can only be done by letting the system handle less onDestroy events:
-		// see: https://developer.android.com/guide/topics/resources/runtime-changes#java
-		// this would mean:
-		// 1) configure onDestroy not to be called when the screen is rotated
-		// 2) calling restartDelayed() here
-		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
-
-		// ! restart is turned off for now since the restarts can trigger a recurring restart
-		// ! the option to auto reboot a player when it is detected to not play should be
-		// ! sufficient to keep players active
-		 Log.i(className,".onDestroy: Delayed restart of the application!!!");
-		 restartDelayed();
-
-		// the onStop method should have set callbacks to null already, but just to be sure
-		if (checkRestartService != null) {
-			checkRestartService.setCallbacks(null);
-			Log.i(className, ".onDestroy: callbacks set to null on restart service");
-		}
-		// the onStop method should have unbound the service already, but just to be sure
-		if (bound) {
-			unBindServiceConnection();
-		} else {
-			Log.i(className, ".onDestroy: connection is unbound");
-		}
 		this.destroyBrowserView();
-		super.onDestroy();
-		Log.i(className, ".onDestroy: end");
+		this.openBrowserView(true, false, this.retrieveOrGeneratePlayerId());
+	}
+
+	private void reloadBrowserView() {
+		if (webView != null) {
+			webView.reload();
+		} else if (twaServiceConnection != null) {
+			// TODO reload TWA
+		}
 	}
 
 	private void destroyBrowserView() {
@@ -846,12 +834,12 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			viewGroup = (ViewGroup) webView.getParent();
 			if (viewGroup != null)
 			{
-				Log.i(className, ".destroyWebView: removeView()");
+				Log.i(className, "destroyWebView: removeView()");
 				// viewGroup.removeAllViews();
 				viewGroup.removeView(webView);
 			}
 
-			Log.i(className, ".destroyWebView: prepare webView.destroy()");
+			Log.i(className, "destroyWebView: prepare webView.destroy()");
 			webView.clearHistory();
 
 			// NOTE: clears RAM cache, if you pass true, it will also clear the disk cache.
@@ -873,7 +861,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			webView.removeAllViews();
 
 			// NOTE: This can occasionally cause a segfault below API 17 (4.2)
-			Log.i(className, ".destroyWebView: webView.destroy()");
+			Log.i(className, "destroyWebView: webView.destroy()");
 			webView.destroy();
 		}
 	}
@@ -882,67 +870,19 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// TODO destroy the TWA view analog to destroyWebView
 	}
 
-	@SuppressLint("InlinedApi")
-	protected void hideBars() {
-		if (getWindow() != null) {
-			View decorView = getWindow().getDecorView();
-			// Hide both the navigation bar and the status bar.
-			// SYSTEM_UI_FLAG_FULLSCREEN is only available on Android 4.1 and higher, but as
-			// a general rule, you should design your app to hide the status bar whenever you
-			// hide the navigation bar.
-			int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-							| View.SYSTEM_UI_FLAG_FULLSCREEN
-							| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-							| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-							| View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
-			// Enables regular immersive mode.
-			// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
-			// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-//					| View.SYSTEM_UI_FLAG_IMMERSIVE;
-			decorView.setSystemUiVisibility(uiOptions);
-		}
-		// Remember that you should never show the action bar if the
-		// status bar is hidden, so hide that too if necessary.
-		ActionBar actionBar = getActionBar();
-		if (actionBar != null) {
-			actionBar.hide();
-		}
-	}
-
-	@Override
-	/* Navigate the WebView's history when the user presses the Back key. */
-	public void onBackPressed() {
-		if (webView != null) {
-			if (webView.canGoBack()) {
-				webView.goBack();
-			} else {
-				super.onBackPressed();
-			}
+	private void finishAndRemoveTaskCompat() {
+		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			this.finishAndRemoveTask();
 		} else {
-			super.onBackPressed();
+			this.finish();
 		}
 	}
 
-	/*
-	 * PRIVATE methods
-	 */
-	// Get a MemoryInfo object for the device's current memory status.
-	private ActivityManager.MemoryInfo getAvailableMemory() {
-		ActivityManager activityManager = (ActivityManager) this.getSystemService(ACTIVITY_SERVICE);
-		ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
-		activityManager.getMemoryInfo(memoryInfo);
-		return memoryInfo;
-	}
-
-	private String getStoredPlayerId() {
-		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
-		return sharedPreferences.getString(getString(R.string.player_id_store), "");
-	}
-
-	private void storePlayerId(String value) {
-		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
-		SharedPreferences.Editor editor = sharedPreferences.edit();
-		editor.putString(getString(R.string.player_id_store), value);
-		editor.commit();
+	private String httpsRequired() {
+		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+			return "no";
+		} else {
+			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
+		}
 	}
 }
