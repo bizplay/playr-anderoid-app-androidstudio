@@ -111,7 +111,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		decorView.setKeepScreenOn(true);
 		setContentView(R.layout.activity_main);
 
-		String playerId = retrieveOrGeneratePlayerId();
+//		String playerId = retrieveOrGeneratePlayerId();
 
 		// on Android 10 and later getting the app to start up uses an overlay
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -130,64 +130,143 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		}
 
 		// create Trusted Web Access or fall back to a WebView
+//		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
+		openBrowserView((savedInstanceState == null),
+						(savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
+						retrieveOrGeneratePlayerId());
+//		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
+//		// * URL bar stays visible
+//		// * button bar stays visible
+//		// * video's with sound do not play even though they do in Chrome (whn playing the same channel)
+//		if (false) {
+////		if (chromePackage != null) {
+//			Log.i(className, ".onCreate chromePackage is not null");
+//			if (!chromeVersionChecked) {
+//				Log.i(className, ".onCreate !chromeVersionChecked");
+//				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
+//				chromeVersionChecked = true;
+//			}
+//
+//			this.twaServiceConnection = openTWAView(savedInstanceState, chromePackage);
+////			if (savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)) {
+////				Log.i(className, ".onCreate TWA was launched => finish");
+////				this.finish();
+////			} else {
+////				Log.i(className, ".onCreate launching TWA");
+////				this.twaServiceConnection = new MainActivity.TwaCustomTabsServiceConnection();
+//////				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
+////				CustomTabsClient.bindCustomTabsService(this, chromePackage, this.twaServiceConnection);
+////			}
+//		} else {
+//			// fall back to WebView
+//			webView = openWebView(savedInstanceState, playerId);
+////			webView = (WebView) findViewById(R.id.mainUiView);
+////			Log.i(className, ".onCreate; webView is " + (webView == null ? "null" : "not null"));
+////			setupWebView(webView);
+////			webView.setWebChromeClient(createWebChromeClient());
+////			webView.setWebViewClient(createWebViewClient());
+////			webView.setKeepScreenOn(true);
+////			if (savedInstanceState == null) {
+////				webView.loadDataWithBaseURL("file:///android_asset/",
+////						initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+////			}
+////
+////			// Callbacks for service binding, passed to bindService()
+////			serviceConnection = new ServiceConnection() {
+////				private static final String className = "ServiceConnection";
+////
+////				@Override
+////				public void onServiceConnected(ComponentName componentName, IBinder service) {
+////					Log.i(className, "override onServiceConnected");
+////					// cast the IBinder and get CheckRestartService instance
+////					biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+////					checkRestartService = binder.getService();
+////					bound = true;
+////					checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+////					Log.i(className, ".onServiceConnected: service bound");
+////				}
+////
+////				@Override
+////				public void onServiceDisconnected(ComponentName componentName) {
+////					Log.i(className, "override onServiceDisconnected");
+////					bound = false;
+////				}
+////			};
+//		}
+	}
+
+	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
+		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
 		// * URL bar stays visible
 		// * button bar stays visible
-		// * video's with sound do not play even though they do in Chrome (whn playing the same channel)
+		// * video's with sound do not play even though they do in Chrome (when playing the same channel)
 		if (false) {
 //		if (chromePackage != null) {
-			Log.i(className, ".onCreate chromePackage is not null");
+			Log.i(className, ".openBrowserView chromePackage is not null");
 			if (!chromeVersionChecked) {
-				Log.i(className, ".onCreate !chromeVersionChecked");
+				Log.i(className, ".openBrowserView !chromeVersionChecked");
 				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
 				chromeVersionChecked = true;
 			}
 
-			if (savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)) {
-				Log.i(className, ".onCreate TWA was launched => finish");
-				this.finish();
-			} else {
-				Log.i(className, ".onCreate launching TWA");
-				this.twaServiceConnection = new MainActivity.TwaCustomTabsServiceConnection();
-//				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
-				CustomTabsClient.bindCustomTabsService(this, chromePackage, this.twaServiceConnection);
-			}
+			twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
 		} else {
 			// fall back to WebView
-			webView = (WebView) findViewById(R.id.mainUiView);
-			Log.i(className, ".onCreate; webView is " + (webView == null ? "null" : "not null"));
-			setupWebView(webView);
-			webView.setWebChromeClient(createWebChromeClient());
-			webView.setWebViewClient(createWebViewClient());
-			webView.setKeepScreenOn(true);
-			if (savedInstanceState == null) {
-				webView.loadDataWithBaseURL("file:///android_asset/",
-						initialHtmlPage(playerId, webView.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+			webView = openWebView(initialiseWebContent, playerId);
+		}
+	}
+
+	private TwaCustomTabsServiceConnection openTWAView(boolean twaWasLaunched, String chromePackage) {
+		TwaCustomTabsServiceConnection result = null;
+
+		if (twaWasLaunched) {
+			Log.i(className, ".openTWAView TWA was launched => finish");
+			this.finish();
+		} else {
+			Log.i(className, ".openTWAView launching TWA");
+			result = new MainActivity.TwaCustomTabsServiceConnection();
+//				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
+			CustomTabsClient.bindCustomTabsService(this, chromePackage, result);
+		}
+		return result;
+	}
+
+	private WebView openWebView(boolean initialiseWebContent, String playerId) {
+		WebView result = (WebView) findViewById(R.id.mainUiView);
+		Log.i(className, ".openWebView; webView is " + (result == null ? "null" : "not null"));
+		setupWebView(result);
+		result.setWebChromeClient(createWebChromeClient());
+		result.setWebViewClient(createWebViewClient());
+		result.setKeepScreenOn(true);
+		if (initialiseWebContent) {
+			result.loadDataWithBaseURL("file:///android_asset/",
+					initialHtmlPage(playerId, result.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+		}
+
+		// Callbacks for service binding, passed to bindService()
+		serviceConnection = new ServiceConnection() {
+			private static final String className = "ServiceConnection";
+
+			@Override
+			public void onServiceConnected(ComponentName componentName, IBinder service) {
+				Log.i(className, "override onServiceConnected");
+				// cast the IBinder and get CheckRestartService instance
+				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+				checkRestartService = binder.getService();
+				bound = true;
+				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+				Log.i(className, ".onServiceConnected: service bound");
 			}
 
-			// Callbacks for service binding, passed to bindService()
-			serviceConnection = new ServiceConnection() {
-				private static final String className = "ServiceConnection";
-
-				@Override
-				public void onServiceConnected(ComponentName componentName, IBinder service) {
-					Log.i(className, "override onServiceConnected");
-					// cast the IBinder and get CheckRestartService instance
-					biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-					checkRestartService = binder.getService();
-					bound = true;
-					checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-					Log.i(className, ".onServiceConnected: service bound");
-				}
-
-				@Override
-				public void onServiceDisconnected(ComponentName componentName) {
-					Log.i(className, "override onServiceDisconnected");
-					bound = false;
-				}
-			};
-		}
+			@Override
+			public void onServiceDisconnected(ComponentName componentName) {
+				Log.i(className, "override onServiceDisconnected");
+				bound = false;
+			}
+		};
+		return result;
 	}
 
 	private void requestManageOverlayPermission(Context context) {
@@ -475,6 +554,20 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		Log.i(className, "restartDelayed: end");
 	}
 
+	private void recreateBrowserView() {
+		this.unBindServiceConnection();
+		this.destroyBrowserView();
+		this.openBrowserView(true, false, this.retrieveOrGeneratePlayerId());
+	}
+
+	private void reloadBrowserView() {
+		if (webView != null) {
+			webView.reload();
+		} else if (twaServiceConnection != null) {
+			// TODO reload TWA
+		}
+	}
+
 	// implement the ComponentCallbacks2 interface
 	/**
 	 * Release memory when the UI becomes hidden or when system resources become low.
@@ -486,22 +579,6 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		Log.w(className, "onTrimMemory - level: " + level);
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
-			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
-                // Release any UI objects that currently hold memory.
-                // The user interface has moved to the background.
-				// RELOAD WEBVIEW
-				break;
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
-                // Release any memory that your app doesn't need to run.
-				//
-                // The device is running low on memory while the app is running.
-                // The event raised indicates the severity of the memory-related event.
-                // If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
-                // begin killing background processes.
-				// RELOAD WEBVIEW
-				break;
 			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
 			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
 			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
@@ -511,14 +588,31 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
                 // The event raised indicates where the app sits within the LRU list.
                 // If the event is TRIM_MEMORY_COMPLETE, the process will be one of
                 // the first to be terminated.
-				// RESTART THE APP
+				// ==>> restart the application
+				this.restartActivity();
 				break;
+			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+				// Release any UI objects that currently hold memory.
+				// The user interface has moved to the background.
+				// ==>> dump browser view and recreate it
+				this.recreateBrowserView();
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
+				// Release any memory that your app doesn't need to run.
+				//
+				// The device is running low on memory while the app is running.
+				// The event raised indicates the severity of the memory-related event.
+				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
+				// begin killing background processes.
+				// ==>> reload browser view
 			default:
                 // Release any non-critical data structures.
 				//
                 // The app received an unrecognized memory level value
                 // from the system. Treat this as a generic low-memory message.
-				// RELOAD WEBVIEW
+				// ==>> reload browser view
+				this.reloadBrowserView();
 				break;
 		}
 	}
@@ -654,17 +748,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			checkRestartService.setCallbacks(null);
 			Log.i(className, "onStop: callbacks set to null on restart service");
 		}
-		if (bound) {
-			if (this.twaServiceConnection != null) {
-				unbindService(this.twaServiceConnection);
-				bound = false;
-				Log.i(className, "onStop: TWA service connection was unbound");
-			} else if (webView != null) {
-				unbindService(this.serviceConnection);
-				bound = false;
-				Log.i(className, "onStop: service connection (webView fall back) was unbound");
-			}
-		}
+		this.unBindServiceConnection();
 		// The application is pushed into the background
 		// This method is also called when the device is turned (portrait/landscape
 		// switch) and will result in repeated restart of the app
@@ -676,6 +760,20 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// restartDelayed();
 		super.onStop();
 		Log.i(className, "onStop: end");
+	}
+
+	private void unBindServiceConnection() {
+		if (bound) {
+			if (this.twaServiceConnection != null) {
+				unbindService(this.twaServiceConnection);
+				bound = false;
+				Log.i(className, ".unBindServiceConnection: TWA service connection was unbound");
+			} else if (webView != null) {
+				unbindService(this.serviceConnection);
+				bound = false;
+				Log.i(className, ".unBindServiceConnection: service connection (webView fall back) was unbound");
+			}
+		}
 	}
 
 	@Override
@@ -723,24 +821,22 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		}
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
-			if (this.twaServiceConnection != null) {
-				unbindService(this.twaServiceConnection);
-				bound = false;
-				Log.i(className, ".onDestroy: TWA service connection was unbound");
-			} else if (webView != null) {
-				unbindService(this.serviceConnection);
-				bound = false;
-				Log.i(className, ".onDestroy: service connection (webView fall back) was unbound");
-			}
+			unBindServiceConnection();
 		} else {
 			Log.i(className, ".onDestroy: connection is unbound");
 		}
+		this.destroyBrowserView();
+		super.onDestroy();
+		Log.i(className, ".onDestroy: end");
+	}
+
+	private void destroyBrowserView() {
 		if (webView != null) {
 			destroyWebView(webView);
 			webView = null;
+		} else if (twaServiceConnection != null) {
+			destroyTWAView(twaServiceConnection);
 		}
-		super.onDestroy();
-		Log.i(className, ".onDestroy: end");
 	}
 
 	private void destroyWebView(WebView webView) {
@@ -780,6 +876,10 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			Log.i(className, ".destroyWebView: webView.destroy()");
 			webView.destroy();
 		}
+	}
+
+	private void destroyTWAView(TwaCustomTabsServiceConnection twaServiceConnection) {
+		// TODO destroy the TWA view analog to destroyWebView
 	}
 
 	@SuppressLint("InlinedApi")
