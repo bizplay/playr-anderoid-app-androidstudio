@@ -121,7 +121,6 @@
 		</activity>
 		<service
 			android:name="biz.playr.CheckRestartService"
-			android:process=":biz.playr.CheckRestartService"
 			android:enabled="true" />
 		<!--<service
 			android:name="biz.playr.CheckRestartService"
