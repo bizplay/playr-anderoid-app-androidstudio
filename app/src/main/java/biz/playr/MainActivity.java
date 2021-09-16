@@ -109,9 +109,6 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			}
 		});
 		decorView.setKeepScreenOn(true);
-		setContentView(R.layout.activity_main);
-
-//		String playerId = retrieveOrGeneratePlayerId();
 
 		// on Android 10 and later getting the app to start up uses an overlay
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -140,21 +137,21 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	{
 		Log.i(className, "override onActivityResult");
 		if (resultCode == Activity.RESULT_CANCELED) {
-			Log.i(className, ".onActivityResult: RESULT_CANCELED - activity was cancelled, resultCode: " + resultCode);
+			Log.i(className, "onActivityResult: RESULT_CANCELED - activity was cancelled, resultCode: " + resultCode);
 			// code to handle cancelled state
 		}
 		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
-			Log.i(className, ".onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
+			Log.i(className, "onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
 			// code to handle REQUEST_OVERLAY_PERMISSION case
 		}
 	}
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
 		if (requestCode == REQUEST_OVERLAY_PERMISSION) {
 			if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-				Log.i(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! permission: " + permissions[0]);
+				Log.i(className, "onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! permission: " + permissions[0]);
 			} else {
 				// Permission request was denied.
-				Log.e(className, ".onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
+				Log.e(className, "onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
 			}
 		} else {
 			// nothing currently
@@ -172,14 +169,14 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 
 	public void handleUncaughtException(Thread paramThread,
 		Throwable paramThrowable) {
-		Log.e(className, ".handleUncaughtException; paramThread: " + paramThread
+		Log.e(className, "handleUncaughtException; paramThread: " + paramThread
 				+ ", paramThrowable: " + paramThrowable);
 		// restartActivity();
 		recreate();
 	}
 
 	public void restartDelayed() {
-		Log.i(className, ".restartDelayed");
+		Log.i(className, "restartDelayed");
 
 		// the context of the activityIntent might need to be the running PlayrService
 		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
@@ -195,19 +192,19 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 		if (mgr != null) {
-			Log.i(className, ".restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
+			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, ".restartDelayed: called setExactAndAllowWhileIdle");
+				Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
 			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, ".restartDelayed: called setExact");
+				Log.i(className, "restartDelayed: called setExact");
 			} else {
 				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, ".restartDelayed: called set");
+				Log.i(className, "restartDelayed: called set");
 			}
 		}
-		Log.i(className, ".restartDelayed: end");
+		Log.i(className, "restartDelayed: end");
 	}
 
 	// implement the ComponentCallbacks2 interface
@@ -216,9 +213,9 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	 * @param level the memory-related event that was raised.
 	 */
 	public void onTrimMemory(int level) {
-		Log.i(className, ".onTrimMemory");
+		Log.i(className, "onTrimMemory");
 
-		Log.w(className, ".onTrimMemory - level: " + level);
+		Log.w(className, "onTrimMemory - level: " + level);
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
 			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
@@ -492,6 +489,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	 * PRIVATE methods
 	 */
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
+		setContentView(R.layout.activity_main);
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
@@ -500,9 +498,9 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// * video's with sound do not play even though they do in Chrome (when playing the same channel)
 		if (false) {
 //		if (chromePackage != null) {
-			Log.i(className, ".openBrowserView chromePackage is not null");
+			Log.i(className, "openBrowserView chromePackage is not null");
 			if (!chromeVersionChecked) {
-				Log.i(className, ".openBrowserView !chromeVersionChecked");
+				Log.i(className, "openBrowserView !chromeVersionChecked");
 				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
 				chromeVersionChecked = true;
 			}
@@ -518,10 +516,10 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		TwaCustomTabsServiceConnection result = null;
 
 		if (twaWasLaunched) {
-			Log.i(className, ".openTWAView TWA was launched => finish");
+			Log.i(className, "openTWAView TWA was launched => finish");
 			this.finish();
 		} else {
-			Log.i(className, ".openTWAView launching TWA");
+			Log.i(className, "openTWAView launching TWA");
 			result = new MainActivity.TwaCustomTabsServiceConnection();
 //				TwaCustomTabsServiceConnection twaServiceConnection = new TwaCustomTabsServiceConnection();
 			CustomTabsClient.bindCustomTabsService(this, chromePackage, result);
@@ -531,7 +529,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
 		WebView result = (WebView) findViewById(R.id.mainUiView);
-		Log.i(className, ".openWebView; webView is " + (result == null ? "null" : "not null"));
+		Log.i(className, "openWebView; webView is " + (result == null ? "null" : "not null"));
 		setupWebView(result);
 		result.setWebChromeClient(createWebChromeClient());
 		result.setWebViewClient(createWebViewClient());
@@ -553,7 +551,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				checkRestartService = binder.getService();
 				bound = true;
 				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-				Log.i(className, ".onServiceConnected: service bound");
+				Log.i(className, "onServiceConnected: service bound");
 			}
 
 			@Override
@@ -568,7 +566,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private void requestManageOverlayPermission(Context context) {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isAndroidTV()) {
 			if (!Settings.canDrawOverlays(context)) {
-				Log.i(className, ".requestManageOverlayPermission: requesting overlay permission");
+				Log.i(className, "requestManageOverlayPermission: requesting overlay permission");
 				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
 						Uri.parse("package:" + getPackageName()));
 				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
@@ -627,7 +625,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			private static final String className = "biz.playr.WebViewClient";
 
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
-				Log.i(className, ".shouldOverrideUrlLoading");
+				Log.i(className, "shouldOverrideUrlLoading");
 				// Return false from the callback instead of calling view.loadUrl
 				// instead. Calling loadUrl introduces a subtle bug where if you
 				// have any iframe within the page with a custom scheme URL
@@ -644,7 +642,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
 				// Log.i(className, "override onReceivedError");
 				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
-				Log.e(className, ".onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
+				Log.e(className, "onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
 				if ("net::".equals(description.subSequence(0,5))) {
 					// ignore network errors
 				} else {
@@ -662,7 +660,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				// Log.i(className, "override onReceivedError");
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
-					Log.e(className, ".onReceivedError: WebView error - " + error.getDescription()
+					Log.e(className, "onReceivedError: WebView error - " + error.getDescription()
 							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
 				}
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -805,12 +803,14 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	}
 
 	private void recreateBrowserView() {
+		Log.i(className, "recreateBrowserView");
 		this.unBindServiceConnection();
 		this.destroyBrowserView();
 		this.openBrowserView(true, false, this.retrieveOrGeneratePlayerId());
 	}
 
 	private void reloadBrowserView() {
+		Log.i(className, "reloadBrowserView");
 		if (webView != null) {
 			webView.reload();
 		} else if (twaServiceConnection != null) {
@@ -819,6 +819,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	}
 
 	private void destroyBrowserView() {
+		Log.i(className, "destroyBrowserView");
 		if (webView != null) {
 			destroyWebView(webView);
 			webView = null;
@@ -863,10 +864,13 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			// NOTE: This can occasionally cause a segfault below API 17 (4.2)
 			Log.i(className, "destroyWebView: webView.destroy()");
 			webView.destroy();
+		} else {
+			Log.i(className, "destroyWebView: webView is null!");
 		}
 	}
 
 	private void destroyTWAView(TwaCustomTabsServiceConnection twaServiceConnection) {
+		Log.i(className, "destroyTWAView");
 		// TODO destroy the TWA view analog to destroyWebView
 	}
 
