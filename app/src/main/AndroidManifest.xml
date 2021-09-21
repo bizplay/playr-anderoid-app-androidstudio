@@ -123,14 +123,13 @@
 			android:name="biz.playr.CheckRestartService"
 			android:exported="false"
 			android:label="@string/watchdog_name"
-			android:process=":CheckRestartService"/>
-			android:enabled="true" />
+			android:enabled="true"/>
 		<!--<service
 			android:name="biz.playr.CheckRestartService"
-			android:enabled="true"
 			android:persistent="true"
 			android:isolatedProcess="true"
-			android:process=":biz.playr.CheckRestartService"/>
+			android:process=":CheckRestartService"
+			android:enabled="true"/>
 
 		<service android:name="biz.playr.PlayrService"/>
 		 -->

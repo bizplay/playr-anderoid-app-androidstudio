@@ -58,8 +58,8 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
 	private ServiceConnection serviceConnection = null;
-	private ActivityManager.MemoryInfo lastMemoryInfo = null;
-	private long availHeapSizeInMB = 0;
+	private ActivityManager.MemoryInfo firstMemoryInfo = null;
+	private long firstAvailableHeapSizeInMB = 0;
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -88,9 +88,14 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// }, 20000);
 
 		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
-		this.lastMemoryInfo = new ActivityManager.MemoryInfo();
+		this.firstMemoryInfo = getAvailableMemory();
+		Log.e(className, "********************\n***\n***\n***\n***\n*** total memory: " + this.firstMemoryInfo.totalMem +
+				" available memory: " + this.firstMemoryInfo.availMem +
+				" threshold: " + this.firstMemoryInfo.threshold +
+				" low memory?: " + this.firstMemoryInfo.lowMemory + "\n***\n***\n***\n***\n****************************************");
 		Runtime runtime = Runtime.getRuntime();
-		this.availHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
+		this.firstAvailableHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
+		Log.e(className, "********************\n***\n***\n***\n***\n*** available heap size in MB: " + this.firstAvailableHeapSizeInMB + "\n***\n***\n***\n***\n****************************************");
 
 		// start the watchdog service
 //		CheckRestartService crs = CheckRestartService.new();
@@ -227,8 +232,9 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
-
 		Log.e(className, "********************\n***\n***\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n***\n***\n****************************************");
+		this.reportMemoryStatus();
+
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
 			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
@@ -266,6 +272,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
                 // The app received an unrecognized memory level value
                 // from the system. Treat this as a generic low-memory message.
 				// ==>> reload browser view
+				Log.e(className, "onTrimMemory - Non standard level detected: " + level);
 				break;
 		}
 	}
@@ -569,11 +576,11 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				Log.i(className, "override onServiceConnected");
 				// cast the IBinder and get CheckRestartService instance
 				// service is an android.os.BinderProxy
-//				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-//				checkRestartService = binder.getService();
-				service.isBinderAlive();
-				bound = true;
+				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+				checkRestartService = binder.getService();
+//				service.isBinderAlive();
 				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
+				bound = true;
 				Log.i(className, "onServiceConnected: service bound");
 			}
 
@@ -715,6 +722,18 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
 				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
 	};
+
+	private void reportMemoryStatus() {
+		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
+		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
+		Log.e(className, "********************\n***\n***\n***\n***\n*** total memory: " + memoryInfo.totalMem +
+				" available memory: " + memoryInfo.availMem +
+				" threshold: " + memoryInfo.threshold +
+				" low memory?: " + memoryInfo.lowMemory + "\n***\n***\n***\n***\n****************************************");
+		Runtime runtime = Runtime.getRuntime();
+		long availableHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
+		Log.e(className, "********************\n***\n***\n***\n***\n*** available heap size in MB: " + availableHeapSizeInMB + "\n***\n***\n***\n***\n****************************************");
+	}
 
 	private String pageUrl(String playerId, String webviewUserAgent) {
 		String webviewVersion = "Android System WebView not installed";
