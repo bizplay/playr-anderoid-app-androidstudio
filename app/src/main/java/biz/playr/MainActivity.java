@@ -58,6 +58,8 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
 	private ServiceConnection serviceConnection = null;
+	private ActivityManager.MemoryInfo lastMemoryInfo = null;
+	private long availHeapSizeInMB = 0;
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -84,6 +86,15 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		// throw new IllegalArgumentException("Test exception");
 		// }
 		// }, 20000);
+
+		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
+		this.lastMemoryInfo = new ActivityManager.MemoryInfo();
+		Runtime runtime = Runtime.getRuntime();
+		this.availHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
+
+		// start the watchdog service
+//		CheckRestartService crs = CheckRestartService.new();
+//		crs.startService();
 
 		// Set up looks of the view
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -212,8 +223,10 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	 * Release memory when the UI becomes hidden or when system resources become low.
 	 * @param level the memory-related event that was raised.
 	 */
+	@Override
 	public void onTrimMemory(int level) {
-		Log.i(className, "onTrimMemory");
+		Log.i(className, "override onTrimMemory");
+		super.onTrimMemory(level);
 
 		Log.e(className, "********************\n***\n***\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n***\n***\n****************************************");
 		// Determine which lifecycle or system event was raised.
@@ -323,8 +336,10 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		super.onStart();
 		if (this.twaServiceConnection != null) {
 			// bind to CheckRestartService
-			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
-			bindService(intent, this.twaServiceConnection, Context.BIND_AUTO_CREATE);
+//			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
+			Intent intent = new Intent(this, CheckRestartService.class);
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE);
 			// checkRestartService = TODO how do we point this attribute to the service instance
 			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
 			bound = true;
@@ -333,9 +348,13 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
 			}
 			Intent intent = new Intent(this, CheckRestartService.class);
-			bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE);
 			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
 			bound = true;
+			if (this.checkRestartService == null) {
+				Log.e(className, "onStart: checkRestartService is null after bindService.");
+			}
 		} else {
 			Log.e(className, "onStart: twaServiceConnection and webView are null; restart service not bound");
 		}
@@ -546,10 +565,13 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 
 			@Override
 			public void onServiceConnected(ComponentName componentName, IBinder service) {
+//			public void onServiceConnected(ComponentName componentName, android.os.BinderProxy service) {
 				Log.i(className, "override onServiceConnected");
 				// cast the IBinder and get CheckRestartService instance
-				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
-				checkRestartService = binder.getService();
+				// service is an android.os.BinderProxy
+//				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+//				checkRestartService = binder.getService();
+				service.isBinderAlive();
 				bound = true;
 				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
 				Log.i(className, "onServiceConnected: service bound");
@@ -558,6 +580,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 			@Override
 			public void onServiceDisconnected(ComponentName componentName) {
 				Log.i(className, "override onServiceDisconnected");
+				checkRestartService.setCallbacks(null);
 				bound = false;
 			}
 		};
