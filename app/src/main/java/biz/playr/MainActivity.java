@@ -215,7 +215,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	public void onTrimMemory(int level) {
 		Log.i(className, "onTrimMemory");
 
-		Log.w(className, "onTrimMemory - level: " + level);
+		Log.e(className, "********************\n***\n***\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n***\n***\n****************************************");
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
 			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
@@ -231,13 +231,13 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				this.restartActivity();
 				break;
 			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
 				// Release any UI objects that currently hold memory.
 				// The user interface has moved to the background.
 				// ==>> dump browser view and recreate it
 				this.recreateBrowserView();
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
 				// Release any memory that your app doesn't need to run.
 				//
 				// The device is running low on memory while the app is running.
@@ -245,13 +245,14 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
 				// begin killing background processes.
 				// ==>> reload browser view
+				this.reloadBrowserView();
+				break;
 			default:
                 // Release any non-critical data structures.
 				//
                 // The app received an unrecognized memory level value
                 // from the system. Treat this as a generic low-memory message.
 				// ==>> reload browser view
-				this.reloadBrowserView();
 				break;
 		}
 	}
