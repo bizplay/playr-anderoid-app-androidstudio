@@ -121,6 +121,9 @@
 		</activity>
 		<service
 			android:name="biz.playr.CheckRestartService"
+			android:exported="false"
+			android:label="@string/watchdog_name"
+			android:process=":CheckRestartService"/>
 			android:enabled="true" />
 		<!--<service
 			android:name="biz.playr.CheckRestartService"
