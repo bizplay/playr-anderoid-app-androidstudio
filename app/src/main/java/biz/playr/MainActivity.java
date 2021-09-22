@@ -2,7 +2,7 @@ package biz.playr;
 
 import java.util.UUID;
 
-import android.Manifest;
+//import android.Manifest;
 import android.app.ActivityManager;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
@@ -49,7 +49,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
-import androidx.core.app.ActivityCompat;
+//import androidx.core.app.ActivityCompat;
 import androidx.webkit.WebViewCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks, ComponentCallbacks2 {
@@ -58,8 +58,13 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
 	private ServiceConnection serviceConnection = null;
+	// Memory reporting
 	private ActivityManager.MemoryInfo firstMemoryInfo = null;
 	private long firstAvailableHeapSizeInMB = 0;
+	private Handler reportingHandler = null;
+	private Runnable reportingRunner = null;
+	private static final long MB = 1048576L;
+	private static final long thirtyMinutes = 30*60*1000;
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -89,13 +94,9 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 
 		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
 		this.firstMemoryInfo = getAvailableMemory();
-		Log.e(className, "********************\n***\n***\n***\n***\n*** total memory: " + this.firstMemoryInfo.totalMem +
-				" available memory: " + this.firstMemoryInfo.availMem +
-				" threshold: " + this.firstMemoryInfo.threshold +
-				" low memory?: " + this.firstMemoryInfo.lowMemory + "\n***\n***\n***\n***\n****************************************");
 		Runtime runtime = Runtime.getRuntime();
-		this.firstAvailableHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
-		Log.e(className, "********************\n***\n***\n***\n***\n*** available heap size in MB: " + this.firstAvailableHeapSizeInMB + "\n***\n***\n***\n***\n****************************************");
+		this.firstAvailableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
+		this.startMemoryReportingAtInterval(thirtyMinutes); // report memory every 30 minutes
 
 		// start the watchdog service
 //		CheckRestartService crs = CheckRestartService.new();
@@ -554,6 +555,21 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		return result;
 	}
 
+	private void startMemoryReportingAtInterval(long intervalBetweenReporting) {
+		// see; https://developer.android.com/reference/android/os/Handler.html
+		//      https://developer.android.com/reference/java/lang/Runnable.html
+		//      https://developer.android.com/reference/android/os/Looper.html
+		reportingHandler = new Handler();
+
+		reportingRunner = () -> {
+			reportMemoryStatus();
+			// run again
+			reportingHandler.postDelayed(reportingRunner, intervalBetweenReporting);
+		 };
+		// initial run
+		reportingHandler.postDelayed(reportingRunner, intervalBetweenReporting);
+	}
+
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
 		WebView result = (WebView) findViewById(R.id.mainUiView);
 		Log.i(className, "openWebView; webView is " + (result == null ? "null" : "not null"));
@@ -726,12 +742,15 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	private void reportMemoryStatus() {
 		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
-		Log.e(className, "********************\n***\n***\n***\n***\n*** total memory: " + memoryInfo.totalMem +
-				" available memory: " + memoryInfo.availMem +
-				" threshold: " + memoryInfo.threshold +
-				" low memory?: " + memoryInfo.lowMemory + "\n***\n***\n***\n***\n****************************************");
 		Runtime runtime = Runtime.getRuntime();
-		long availableHeapSizeInMB = (runtime.maxMemory()/1048576L) - ((runtime.totalMemory() - runtime.freeMemory())/1048576L);
+		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
+		Log.e(className, "****************************************\n***\n***\n***\n***\n" +
+				"*** total memory: " + memoryInfo.totalMem + " (" + this.firstMemoryInfo.totalMem + ")\n" +
+				"*** available memory: " + memoryInfo.availMem + " (" + this.firstMemoryInfo.availMem + ")\n" +
+				"*** threshold: " + memoryInfo.threshold + " (" + this.firstMemoryInfo.threshold + ")\n" +
+				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
+				"*** available heap size in MB: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ")\n" +
+				"***\n***\n***\n***\n****************************************");
 		Log.e(className, "********************\n***\n***\n***\n***\n*** available heap size in MB: " + availableHeapSizeInMB + "\n***\n***\n***\n***\n****************************************");
 	}
 
