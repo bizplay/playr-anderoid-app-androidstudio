@@ -103,7 +103,7 @@ public class CheckRestartService extends Service {
 
 			@Override
 			public void run() {
-				Log.i(className, "override run");
+				// Log.i(className, "override run");
 				// If you wish to stop the task/polling
 				if (stopTask) {
 					this.cancel();

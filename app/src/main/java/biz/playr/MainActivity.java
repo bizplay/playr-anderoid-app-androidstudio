@@ -52,7 +52,7 @@ import androidx.browser.customtabs.TrustedWebUtils;
 //import androidx.core.app.ActivityCompat;
 import androidx.webkit.WebViewCompat;
 
-public class MainActivity extends Activity implements IServiceCallbacks, ComponentCallbacks2 {
+public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
 	private static final String className = "biz.playr.MainActivity";
 	private CheckRestartService checkRestartService;
@@ -61,10 +61,10 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 	// Memory reporting
 	private ActivityManager.MemoryInfo firstMemoryInfo = null;
 	private long firstAvailableHeapSizeInMB = 0;
-	private Handler reportingHandler = null;
-	private Runnable reportingRunner = null;
+	private Handler memoryCheckHandler = null;
+	private Runnable memoryCheckRunner = null;
 	private static final long MB = 1048576L;
-	private static final long memoryReportingInterval = 120*1000;// 30*60*1000; // 30 minutes
+	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -96,7 +96,7 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		this.firstMemoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
 		this.firstAvailableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
-		this.startMemoryReportingAtInterval(memoryReportingInterval);
+		this.startMemoryCheckingAtInterval(memoryCheckInterval);
 
 		// start the watchdog service
 //		CheckRestartService crs = CheckRestartService.new();
@@ -234,7 +234,6 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
 		Log.e(className, "********************\n***\n***\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n***\n***\n****************************************");
-		this.reportMemoryStatus();
 
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
@@ -555,19 +554,19 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 		return result;
 	}
 
-	private void startMemoryReportingAtInterval(long intervalBetweenReporting) {
+	private void startMemoryCheckingAtInterval(long interval) {
 		// see; https://developer.android.com/reference/android/os/Handler.html
 		//      https://developer.android.com/reference/java/lang/Runnable.html
 		//      https://developer.android.com/reference/android/os/Looper.html
-		reportingHandler = new Handler();
+		memoryCheckHandler = new Handler();
 
-		reportingRunner = () -> {
-			reportMemoryStatus();
+		memoryCheckRunner = () -> {
+			freeMemoryWhenNeeded(analyseMemoryStatus());
 			// run again
-			reportingHandler.postDelayed(reportingRunner, intervalBetweenReporting);
+			memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
 		 };
 		// initial run
-		reportingHandler.postDelayed(reportingRunner, intervalBetweenReporting);
+		memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
 	}
 
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
@@ -739,18 +738,61 @@ public class MainActivity extends Activity implements IServiceCallbacks, Compone
 				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
 	};
 
-	private void reportMemoryStatus() {
+	// MemoryStatus.OK if available memory > 40% of initial available memory AND available memory OR available memory > 800% of threshold
+	// MemoryStatus.MEDIUM if available memory <= 40% of initial available memory OR available memory <= 800% of threshold
+	// MemoryStatus.LOW if available memory <= 20% of initial available memory OR available memory <= 400% of threshold
+	// memoryStatus.CRITICAL if available memory <= 5% of initial available memory OR available memory <= 125% of threshold
+	// TODO: involve/check heap size
+	private MemoryStatus analyseMemoryStatus() {
+		MemoryStatus result = MemoryStatus.OK;
+
 		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
 		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
-		Log.e(className, ".\n************************************************************\n***\n" +
+		if (memoryInfo.availMem > 0.4*this.firstMemoryInfo.availMem && memoryInfo.availMem > 8*memoryInfo.threshold) {
+			result = MemoryStatus.OK;
+		} else if ((memoryInfo.availMem <= 0.4*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 8*memoryInfo.threshold) &&
+					(memoryInfo.availMem > 0.2*this.firstMemoryInfo.availMem || memoryInfo.availMem > 4*memoryInfo.threshold)) {
+			result = MemoryStatus.MEDIUM;
+		} else if ((memoryInfo.availMem <= 0.2*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 4*memoryInfo.threshold) &&
+					(memoryInfo.availMem > 0.05*this.firstMemoryInfo.availMem || memoryInfo.availMem > 1.25*memoryInfo.threshold)) {
+			result = MemoryStatus.LOW;
+		} else { // memoryInfo.availMem <= 0.05*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 1.25*memoryInfo.threshold
+			result = MemoryStatus.CRITICAL;
+		}
+		Log.e(className, ".\n************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
 				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
-				"*** threshold: " + memoryInfo.threshold/MB + " (" + this.firstMemoryInfo.threshold/MB + ", " + (memoryInfo.threshold - this.firstMemoryInfo.threshold)/MB + ") [MB]\n" +
+				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
-				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB)  + ") [MB]\n" +
-				"***\n************************************************************");
+				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
+				"************************************************************\n" +
+				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
+				"************************************************************");
+		return result;
+	}
+	private void freeMemoryWhenNeeded(MemoryStatus status) {
+		switch (status) {
+			case CRITICAL:
+				// Release as much memory as the process can.
+				// ==>> restart the activity
+				this.restartActivity();
+				break;
+			case LOW:
+				// Release any UI objects that currently hold memory.
+				// ==>> dump browser view and recreate it
+				this.recreateBrowserView();
+			case MEDIUM:
+				// Release any memory that your app doesn't need to run.
+				// ==>> reload browser view
+				this.reloadBrowserView();
+				break;
+			case OK:
+			default:
+				// no action needs to be taken
+				break;
+		}
 	}
 
 	private String pageUrl(String playerId, String webviewUserAgent) {
