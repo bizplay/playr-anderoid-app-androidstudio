@@ -738,11 +738,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
 	};
 
-	// MemoryStatus.OK if available memory > 40% of initial available memory AND available memory OR available memory > 800% of threshold
-	// MemoryStatus.MEDIUM if available memory <= 40% of initial available memory OR available memory <= 800% of threshold
-	// MemoryStatus.LOW if available memory <= 20% of initial available memory OR available memory <= 400% of threshold
-	// memoryStatus.CRITICAL if available memory <= 5% of initial available memory OR available memory <= 125% of threshold
-	// TODO: involve/check heap size
+	// We use the ActivityManager.MemoryInfo.threshold: The threshold of availMem at which we consider
+	// memory to be low and start killing background services and other non-extraneous processes.
+	// MemoryStatus.OK       if available memory >  125% of threshold
+	// MemoryStatus.MEDIUM   if available memory <= 125% and > 115% of threshold
+	// MemoryStatus.LOW      if available memory <= 115% and > 105% of threshold
+	// memoryStatus.CRITICAL if available memory <= 105%of threshold
 	private MemoryStatus analyseMemoryStatus() {
 		MemoryStatus result = MemoryStatus.OK;
 
@@ -750,26 +751,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
 		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
-		if (memoryInfo.availMem > 0.4*this.firstMemoryInfo.availMem && memoryInfo.availMem > 8*memoryInfo.threshold) {
+		if (memoryInfo.availMem > 1.25*memoryInfo.threshold) {
 			result = MemoryStatus.OK;
-		} else if ((memoryInfo.availMem <= 0.4*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 8*memoryInfo.threshold) &&
-					(memoryInfo.availMem > 0.2*this.firstMemoryInfo.availMem || memoryInfo.availMem > 4*memoryInfo.threshold)) {
+		} else if (memoryInfo.availMem <= 1.25*memoryInfo.threshold && memoryInfo.availMem > 1.15*memoryInfo.threshold) {
 			result = MemoryStatus.MEDIUM;
-		} else if ((memoryInfo.availMem <= 0.2*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 4*memoryInfo.threshold) &&
-					(memoryInfo.availMem > 0.05*this.firstMemoryInfo.availMem || memoryInfo.availMem > 1.25*memoryInfo.threshold)) {
+		} else if (memoryInfo.availMem <= 1.15*memoryInfo.threshold && memoryInfo.availMem > 1.05*memoryInfo.threshold) {
 			result = MemoryStatus.LOW;
-		} else { // memoryInfo.availMem <= 0.05*this.firstMemoryInfo.availMem || memoryInfo.availMem <= 1.25*memoryInfo.threshold
+		} else { // memoryInfo.availMem <= 1.05*memoryInfo.threshold
 			result = MemoryStatus.CRITICAL;
 		}
-		Log.e(className, ".\n************************************************************\n" +
+		Log.e(className, ".\n*****************************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
 				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
 				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
-				"************************************************************\n" +
+				"*****************************************************************************\n" +
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
-				"************************************************************");
+				"*****************************************************************************");
 		return result;
 	}
 	private void freeMemoryWhenNeeded(MemoryStatus status) {
