@@ -233,7 +233,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
-		Log.e(className, "********************\n***\n***\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n***\n***\n****************************************");
+		Log.e(className, "********************\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n****************************************");
 
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
@@ -241,28 +241,21 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
 			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
                 // Release as much memory as the process can.
-				//
-                // The app is on the LRU list and the system is running low on memory.
-                // The event raised indicates where the app sits within the LRU list.
-                // If the event is TRIM_MEMORY_COMPLETE, the process will be one of
-                // the first to be terminated.
-				// ==>> restart the application
-				this.restartActivity();
-				break;
 			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+				// while testing it turned out that moments after available
+				// memory was at 112% of threshold (in VM) the highest level
+				// reported was TRIM_MEMORY_RUNNING_CRITICAL
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
 				// Release any UI objects that currently hold memory.
 				// The user interface has moved to the background.
+				// ==>> restart the application
+				this.restartActivity();
+				break;
+			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
 				// ==>> dump browser view and recreate it
 				this.recreateBrowserView();
+				break;
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-				// Release any memory that your app doesn't need to run.
-				//
-				// The device is running low on memory while the app is running.
-				// The event raised indicates the severity of the memory-related event.
-				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
-				// begin killing background processes.
 				// ==>> reload browser view
 				this.reloadBrowserView();
 				break;
@@ -760,15 +753,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		} else { // memoryInfo.availMem <= 1.05*memoryInfo.threshold
 			result = MemoryStatus.CRITICAL;
 		}
-		Log.e(className, ".\n*****************************************************************************\n" +
+		Log.e(className, ".\n***************************************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
 				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
 				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
-				"*****************************************************************************\n" +
+				"***************************************************************************************\n" +
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
-				"*****************************************************************************");
+				"***************************************************************************************");
 		return result;
 	}
 	private void freeMemoryWhenNeeded(MemoryStatus status) {
