@@ -254,7 +254,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// Release any UI objects that currently hold memory.
 				// The user interface has moved to the background.
 				// ==>> dump browser view and recreate it
-				this.recreateBrowserView();
+				// this.recreateBrowserView();
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
 				// Release any memory that your app doesn't need to run.
@@ -264,7 +264,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// If the event is TRIM_MEMORY_RUNNING_CRITICAL, then the system will
 				// begin killing background processes.
 				// ==>> reload browser view
-				this.reloadBrowserView();
+				// this.reloadBrowserView();
 				break;
 			default:
                 // Release any non-critical data structures.
@@ -777,16 +777,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			case CRITICAL:
 				// Release as much memory as the process can.
 				// ==>> restart the activity
-				this.restartActivity();
+//				this.restartActivity();
 				break;
 			case LOW:
 				// Release any UI objects that currently hold memory.
 				// ==>> dump browser view and recreate it
-				this.recreateBrowserView();
+//				this.recreateBrowserView();
 			case MEDIUM:
 				// Release any memory that your app doesn't need to run.
 				// ==>> reload browser view
-				this.reloadBrowserView();
+//				this.reloadBrowserView();
 				break;
 			case OK:
 			default:
