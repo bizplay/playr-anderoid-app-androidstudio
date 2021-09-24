@@ -233,7 +233,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
-		Log.e(className, "********************\n***\n***\n*** onTrimMemory - level: " + level + "\n***\n***\n****************************************");
+		Log.e(className, "********************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + analyseMemoryStatus() + "\n****************************************");
 
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
