@@ -336,9 +336,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onStart();
 		if (this.twaServiceConnection != null) {
 			// bind to CheckRestartService
-//			Intent intent = new Intent(MainActivity.this.getBaseContext(), CheckRestartService.class);
 			Intent intent = new Intent(this, CheckRestartService.class);
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE);
 			// checkRestartService = TODO how do we point this attribute to the service instance
 			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
@@ -348,7 +347,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
 			}
 			Intent intent = new Intent(this, CheckRestartService.class);
-			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE);
 			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
 			bound = true;
@@ -394,20 +393,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// restartDelayed();
 		super.onStop();
 		Log.i(className, "onStop: end");
-	}
-
-	private void unBindServiceConnection() {
-		if (bound) {
-			if (this.twaServiceConnection != null) {
-				unbindService(this.twaServiceConnection);
-				bound = false;
-				Log.i(className, "unBindServiceConnection: TWA service connection was unbound");
-			} else if (webView != null) {
-				unbindService(this.serviceConnection);
-				bound = false;
-				Log.i(className, "unBindServiceConnection: service connection (webView fall back) was unbound");
-			}
-		}
 	}
 
 	@Override
@@ -508,6 +493,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	/*
 	 * PRIVATE methods
 	 */
+	private void unBindServiceConnection() {
+		if (bound) {
+			if (this.twaServiceConnection != null) {
+				unbindService(this.twaServiceConnection);
+				bound = false;
+				Log.i(className, "unBindServiceConnection: TWA service connection was unbound");
+			} else if (webView != null) {
+				unbindService(this.serviceConnection);
+				bound = false;
+				Log.i(className, "unBindServiceConnection: service connection (webView fall back) was unbound");
+			}
+		}
+	}
+
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
 		setContentView(R.layout.activity_main);
 		// create Trusted Web Access or fall back to a WebView
