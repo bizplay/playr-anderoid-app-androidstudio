@@ -122,10 +122,12 @@
 		<service
 			android:name="biz.playr.CheckRestartService"
 			android:exported="false"
-			android:label="@string/watchdog_name"
 			android:enabled="true"/>
-		<!--<service
+		<!--
+		<service
 			android:name="biz.playr.CheckRestartService"
+			android:exported="false"
+			android:label="@string/watchdog_name"
 			android:persistent="true"
 			android:isolatedProcess="true"
 			android:process=":CheckRestartService"
