@@ -377,10 +377,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	protected void onStop() {
 		Log.i(className, "override onStop");
-		if (checkRestartService != null) {
-			checkRestartService.setCallbacks(null);
-			Log.i(className, "onStop: callbacks set to null on restart service");
-		}
 		this.unBindServiceConnection();
 		// The application is pushed into the background
 		// This method is also called when the device is turned (portrait/landscape
@@ -433,11 +429,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		 Log.i(className,"onDestroy: Delayed restart of the application!!!");
 		 restartDelayed();
 
-		// the onStop method should have set callbacks to null already, but just to be sure
-		if (checkRestartService != null) {
-			checkRestartService.setCallbacks(null);
-			Log.i(className, "onDestroy: callbacks set to null on restart service");
-		}
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			unBindServiceConnection();
@@ -494,6 +485,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	 * PRIVATE methods
 	 */
 	private void unBindServiceConnection() {
+		if (checkRestartService != null) {
+			checkRestartService.setCallbacks(null);
+			Log.i(className, "unBindServiceConnection: callbacks set to null on restart service");
+		}
 		if (bound) {
 			if (this.twaServiceConnection != null) {
 				unbindService(this.twaServiceConnection);
