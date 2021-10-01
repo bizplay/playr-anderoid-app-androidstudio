@@ -924,9 +924,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			viewGroup = (ViewGroup) webView.getParent();
 			if (viewGroup != null)
 			{
-				Log.i(className, "destroyWebView: removeView()");
-				// viewGroup.removeAllViews();
-				viewGroup.removeView(webView);
+				Log.i(className, "destroyWebView: remove view(s) from viewGroup");
+				// viewGroup.removeView(webView);
+				// to be sure remove all and not just the webView
+				viewGroup.removeAllViews();
+
 			}
 
 			Log.i(className, "destroyWebView: prepare webView.destroy()");
@@ -947,8 +949,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// If you create another WebView after calling this,
 			// make sure to call mWebView.resumeTimers().
 			webView.pauseTimers();
-
-			webView.removeAllViews();
 
 			// NOTE: This can occasionally cause a segfault below API 17 (4.2)
 			Log.i(className, "destroyWebView: webView.destroy()");
