@@ -738,18 +738,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
 		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
-		if (memoryInfo.availMem > 1.25*memoryInfo.threshold) {
-			result = MemoryStatus.OK;
-		} else if (memoryInfo.availMem <= 1.25*memoryInfo.threshold && memoryInfo.availMem > 1.15*memoryInfo.threshold) {
-			result = MemoryStatus.MEDIUM;
-		} else if (memoryInfo.availMem <= 1.15*memoryInfo.threshold && memoryInfo.availMem > 1.05*memoryInfo.threshold) {
-			result = MemoryStatus.LOW;
-		} else { // memoryInfo.availMem <= 1.05*memoryInfo.threshold
-			result = MemoryStatus.CRITICAL;
-		}
+		result = calculateMemoryStatus(memoryInfo.availMem, memoryInfo.threshold);
 		Log.e(className, ".\n***************************************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
 				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
+				"*** used memory: " + (memoryInfo.totalMem - memoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - memoryInfo.availMem)*100/memoryInfo.totalMem + "%] (initially: " + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)*100/memoryInfo.totalMem + "%])\n" +
 				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
@@ -757,7 +750,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
 				"***************************************************************************************");
 		return result;
+
+
 	}
+
+	private MemoryStatus calculateMemoryStatus(long availableMemory, long threshold) {
+		MemoryStatus result = MemoryStatus.OK;
+		if (availableMemory > 1.25*threshold) {
+			result = MemoryStatus.OK;
+		} else if (availableMemory <= 1.25*threshold && availableMemory > 1.15*threshold) {
+			result = MemoryStatus.MEDIUM;
+		} else if (availableMemory <= 1.15*threshold && availableMemory > 1.05*threshold) {
+			result = MemoryStatus.LOW;
+		} else { // availableMemory <= 1.05*threshold
+			result = MemoryStatus.CRITICAL;
+		}
+		return result;
+	}
+
 	private void freeMemoryWhenNeeded(MemoryStatus status) {
 		switch (status) {
 			case CRITICAL:
