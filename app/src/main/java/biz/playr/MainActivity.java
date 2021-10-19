@@ -32,6 +32,7 @@ import android.content.pm.PackageManager;
 import android.view.View;
 import android.os.Handler;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -51,6 +52,9 @@ import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
 //import androidx.core.app.ActivityCompat;
 import androidx.webkit.WebViewCompat;
+//import androidx.webkit.WebResourceRequestCompat;
+//import androidx.webkit.WebSettingsCompat;
+//import androidx.webkit.WebViewClientCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
@@ -563,6 +567,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		result.setWebChromeClient(createWebChromeClient());
 		result.setWebViewClient(createWebViewClient());
 		result.setKeepScreenOn(true);
+		// Make sure necessary cookies are accepted
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			CookieManager cookieManager = CookieManager.getInstance();
+			cookieManager.setAcceptCookie(true);
+			cookieManager.setAcceptThirdPartyCookies(result, true);
+			if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+				cookieManager.setAcceptFileSchemeCookies(true);
+			}
+		}
 		if (initialiseWebContent) {
 			result.loadDataWithBaseURL("file:///android_asset/",
 					initialHtmlPage(playerId, result.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
