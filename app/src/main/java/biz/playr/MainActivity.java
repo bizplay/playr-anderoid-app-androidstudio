@@ -72,6 +72,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
+	private Bundle currentSavedInstanceState;
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
@@ -82,8 +83,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		Log.i(className, "override onCreate");
+		currentSavedInstanceState = savedInstanceState;
 		super.onCreate(savedInstanceState);
 
+		reportSystemInformation();
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setup restarting of app on crash");
 		Thread.setDefaultUncaughtExceptionHandler(new DefaultExceptionHandler(this));
@@ -109,6 +112,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Set up looks of the view
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+//		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//			getWindow().addFlags(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+//		}
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		View decorView = getWindow().getDecorView();
 		decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
@@ -132,8 +138,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		decorView.setKeepScreenOn(true);
 
 		// on Android 10 and later getting the app to start up uses an overlay
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			requestManageOverlayPermission(getApplicationContext());
+		//if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+		//	requestManageOverlayPermission(getApplicationContext());
 //			if (!Settings.canDrawOverlays(getApplicationContext())) {
 //				Intent myIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
 //				Uri uri = Uri.fromParts("package", getPackageName(), null);
@@ -145,7 +152,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 //			if (!Settings.canDrawOverlays(getApplicationContext())) {
 //				startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
 //			}
-		}
+
+		//}
 
 		// create Trusted Web Access or fall back to a WebView
 		openBrowserView((savedInstanceState == null),
@@ -163,7 +171,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
 			Log.i(className, "onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
-			// code to handle REQUEST_OVERLAY_PERMISSION case
+			openBrowserView((currentSavedInstanceState == null),
+					(currentSavedInstanceState != null && currentSavedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
+					retrieveOrGeneratePlayerId());
 		}
 	}
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -488,6 +498,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	/*
 	 * PRIVATE methods
 	 */
+	private void reportSystemInformation() {
+		Log.e(className, "*********************************************************");
+		Log.e(className, "***");
+		Log.e(className, "***  Build version: " + Build.VERSION.SDK_INT);
+		Log.e(className, "***");
+		Log.e(className, "*********************************************************");
+	}
+
 	private void unBindServiceConnection() {
 		if (checkRestartService != null) {
 			checkRestartService.setCallbacks(null);
