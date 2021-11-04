@@ -108,14 +108,14 @@
 				<!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
 				<category android:name="android.intent.category.DEFAULT"/>
-				<data android:scheme="http" android:host="*.playr.biz"/>
-				<data android:scheme="https"/>
-				<!-- for TWA -->
 				<!--
 				<category android:name="androidx.browser.trusted.category.TrustedWebActivities"/>
 				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
 				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
 				<category android:name="androidx.browser.trusted.category.ImmersiveMode"/>
+				for TWA
+				<data android:scheme="http" android:host="*.playr.biz"/>
+				<data android:scheme="https"/>
 				-->
 			</intent-filter>
 		</activity>
