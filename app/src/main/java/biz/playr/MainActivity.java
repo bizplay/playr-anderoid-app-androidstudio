@@ -919,8 +919,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
 		// When navigating back, content is not revalidated, instead the content is just retrieved
-		// from the cache. This method allows the client to override this behavior
-		webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+		// from the cache. Disable the cache to fix this, but since we do not have back
+		// navigation nor use content validation
+		// Default cache usage mode.
+		webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 	}
