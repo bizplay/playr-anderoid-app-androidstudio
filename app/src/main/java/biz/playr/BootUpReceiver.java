@@ -15,12 +15,16 @@ public class BootUpReceiver extends BroadcastReceiver{
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		Log.i(className,"override onReceive");
-		if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+		Log.i(className,".onReceive, received intent:" + intent.getAction().toString());
+		// do not check the intent.getAction() value since the QUICKBOOT_POWERON actions
+		// possibly do not have an intent.ACTION_... equivalent
+		// if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) || Intent.ACTION_REBOOT.equals(intent.getAction()) ||
+		//		Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
 			/*
 			 * The Intent is kept in synch with the Manifest and DefaultExceptionhandler
 			 */
 			// both these variants should work
-            // Intent activityIntent =  context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+			// Intent activityIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
 			// activityIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 			//		| Intent.FLAG_ACTIVITY_CLEAR_TASK
 			//		| Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -31,8 +35,8 @@ public class BootUpReceiver extends BroadcastReceiver{
 			activityIntent.setAction(Intent.ACTION_MAIN);
 			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 			context.startActivity(activityIntent);
-			Log.i(className, ".onReceive service started");
-		}
+			Log.i(className, ".onReceive MainActivity started");
+		// }
 		Log.i(className, ".onReceive: end");
 	}
 }
