@@ -11,7 +11,7 @@ import android.util.Log;
  * see http://chintanrathod.com/auto-restart-application-after-crash-forceclose-in-android/
  */
 class DefaultExceptionHandler implements UncaughtExceptionHandler {
-	private static final String className = "DefaultExceptionHandler";
+	private static final String className = "biz.playr.DefaultExcept";
 	// the restart delay is relatively long because this also affects the
 	// time a user has when changing a setting or using any other app
 	// since that will trigger a restart in the MainActivity that uses
@@ -61,8 +61,9 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 			intent.setAction(Intent.ACTION_MAIN);
 			intent.addCategory(Intent.CATEGORY_LAUNCHER);
 
+			// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
 			PendingIntent pendingIntent = PendingIntent.getActivity(
-					biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT);
+					biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
 
 			//Following code will restart your application after <delay> seconds
 			AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);

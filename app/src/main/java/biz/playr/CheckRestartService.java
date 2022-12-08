@@ -24,7 +24,7 @@ import android.util.Log;
 // If this service should run in a separate process the communication used here will not do
 // Instead use a Broadcast and BroadcastReceiver to communicate between Service and MainActivity
 public class CheckRestartService extends Service {
-	private static final String className = "CheckRestartService";
+	private static final String className = "biz.playr.CheckRestartS";
 	// use type long since the second and third parameter for
 	// scheduleAtFixedRate is of type long
 	// private static final long intervalBetweenRestartChecks = 300000; // 5 minutes in milliseconds
@@ -99,7 +99,7 @@ public class CheckRestartService extends Service {
 
 		// Start polling check for restart task
 		TimerTask task = new TimerTask() {
-			private static final String className = "TimerTask";
+			private static final String className = "biz.playr.TimerTask";
 
 			@Override
 			public void run() {
