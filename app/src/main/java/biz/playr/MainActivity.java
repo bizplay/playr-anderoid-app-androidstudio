@@ -137,23 +137,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		});
 		decorView.setKeepScreenOn(true);
 
-		// on Android 10 and later getting the app to start up uses an overlay
-		//if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-
-		//	requestManageOverlayPermission(getApplicationContext());
-//			if (!Settings.canDrawOverlays(getApplicationContext())) {
-//				Intent myIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-//				Uri uri = Uri.fromParts("package", getPackageName(), null);
-//
-//				myIntent.setData(uri);
-//				startActivityForResult(myIntent, REQUEST_OVERLAY_PERMISSIONS);
-//			}
-
-//			if (!Settings.canDrawOverlays(getApplicationContext())) {
-//				startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
-//			}
-
-		//}
+		// request overlay permission needed for 'auto start' ability
+		requestManageOverlayPermission(getApplicationContext());
 
 		// create Trusted Web Access or fall back to a WebView
 		openBrowserView((savedInstanceState == null),
@@ -218,7 +203,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				| Intent.FLAG_ACTIVITY_NEW_TASK);
 		activityIntent.setAction(Intent.ACTION_MAIN);
 		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT);
+		// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
+		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
 		// delay start so this activity can be ended before the new one starts
 		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
 		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
@@ -601,7 +587,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// Callbacks for service binding, passed to bindService()
 		serviceConnection = new ServiceConnection() {
-			private static final String className = "ServiceConnection";
+			private static final String className = "biz.playr.ServiceConnec";
 
 			@Override
 			public void onServiceConnected(ComponentName componentName, IBinder service) {
@@ -635,6 +621,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 						Uri.parse("package:" + getPackageName()));
 				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
 			}
+//          // old way
+//			if (!Settings.canDrawOverlays(getApplicationContext())) {
+//				startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+//			}
 		}
 	}
 
@@ -658,7 +648,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private WebChromeClient createWebChromeClient() {
 		return new WebChromeClient() {
-			private String className = "WebChromeClient";
+			private String className = "biz.playr.WebChromeClie";
 			// private int count = 0;
 
 			@Override
@@ -867,7 +857,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	};
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
-		private static final String className = "TwaCusTabsSerConnection";
+		private static final String className = "biz.playr.TwaCusTbsSrvC";
 
 		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
 			Log.i(className, " override onCustomTabsServiceConnected");

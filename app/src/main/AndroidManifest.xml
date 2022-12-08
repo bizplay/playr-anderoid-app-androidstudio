@@ -51,7 +51,7 @@
 	<!-- Manage overlay permission, needed for restart on API Q and newer -->
 <!--	<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION"/>-->
 <!--	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>-->
-
+	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application
@@ -101,10 +101,10 @@
 			<!--<intent-filter android:autoVerify="true">-->
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN"/>
-				<action android:name="android.intent.action.VIEW"/>
-				<category android:name="android.intent.category.BROWSABLE"/>
 				<!-- for non TV devices -->
 				<category android:name="android.intent.category.LAUNCHER"/>
+				<action android:name="android.intent.action.VIEW"/>
+				<category android:name="android.intent.category.BROWSABLE"/>
 				<!-- for non AndroidTV devices -->
 				<category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
 				<category android:name="android.intent.category.DEFAULT"/>
@@ -113,9 +113,10 @@
 				<category android:name="androidx.browser.trusted.category.TrustedWebActivitySplashScreensV1"/>
 				<category android:name="androidx.browser.trusted.category.WebShareTargetV2"/>
 				<category android:name="androidx.browser.trusted.category.ImmersiveMode"/>
-				for TWA
-				<data android:scheme="http" android:host="*.playr.biz"/>
+				for TWA, a normal action.MAIN and categroy.LAUNCHER activity does not have data tags
+				<data android:scheme="http"/>
 				<data android:scheme="https"/>
+				<data android:host="*.playr.biz"/>
 				-->
 			</intent-filter>
 		</activity>
