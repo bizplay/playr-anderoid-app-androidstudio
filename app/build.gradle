@@ -43,7 +43,7 @@ android {
         versionCode appManifest.versionCode
         versionName appManifest.versionName
         minSdkVersion 19
-        targetSdkVersion 31
+        targetSdkVersion 33
 
         // The name for the application on the Android Launcher
         resValue "string", "appName", appManifest.name
@@ -125,6 +125,7 @@ android {
             jniDebuggable true
             renderscriptDebuggable true
             renderscriptOptimLevel 3
+            signingConfig signingConfigs.debug
         }
     }
     compileOptions {
