@@ -614,17 +614,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void requestManageOverlayPermission(Context context) {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isAndroidTV()) {
-			if (!Settings.canDrawOverlays(context)) {
-				Log.i(className, "requestManageOverlayPermission: requesting overlay permission");
-				Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-						Uri.parse("package:" + getPackageName()));
-				startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
+		// currently (players using Android 11 and 12 in production) it
+		// seems not necessary to request the overlay permission
+		// in order to have the auto-start work based on "catching" the
+		// 'boot completed' action in the BootUpReceiver
+		if (false) {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isAndroidTV()) {
+				if (!Settings.canDrawOverlays(context)) {
+					Log.i(className, "requestManageOverlayPermission: requesting overlay permission");
+					Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+							Uri.parse("package:" + getPackageName()));
+					startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
+				}
+//      	    // old way
+//				if (!Settings.canDrawOverlays(getApplicationContext())) {
+//					startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+//				}
 			}
-//          // old way
-//			if (!Settings.canDrawOverlays(getApplicationContext())) {
-//				startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
-//			}
 		}
 	}
 
