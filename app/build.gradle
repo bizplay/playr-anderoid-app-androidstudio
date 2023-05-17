@@ -3,8 +3,8 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "2.7.0",
-        versionCode: 35,
+        versionName: "2.8.0",
+        versionCode: 36,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -137,15 +137,15 @@ android {
 dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.leanback:leanback:1.0.0'
-    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'androidx.recyclerview:recyclerview:1.3.0'
     implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.webkit:webkit:1.5.0'
+    implementation 'androidx.webkit:webkit:1.6.1'
 //    implementation 'androidx.browser:browser:1.2.0'
 
     // From TwaDemoJava demo project (also including maven
     // in the build.gradle in the /gradle folder to enable
     // inclusion of code from GitHub)
-    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
 //    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
 //    implementation 'com.google.android.material:material:1.1.0'
 //    testImplementation 'junit:junit:4.12'
