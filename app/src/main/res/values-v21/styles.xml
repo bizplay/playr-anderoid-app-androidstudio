@@ -6,7 +6,7 @@
         res/values-v11/styles.xml on API 11+ devices
         and res/values-v14/styles.xml on API 14+ devices.
     -->
-    <style name="AppBaseTheme" parent="android:Theme.Holo.Light.DarkActionBar">
+    <style name="AppBaseTheme" parent="android:Theme.Holo.Light.NoActionBar.Fullscreen">
         <item name="android:colorPrimary">@color/primary</item>
         <item name="android:windowAllowReturnTransitionOverlap">true</item>
         <item name="android:windowAllowEnterTransitionOverlap">true</item>

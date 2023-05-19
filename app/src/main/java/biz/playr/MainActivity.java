@@ -16,6 +16,7 @@ import android.os.IBinder;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
@@ -50,8 +51,8 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
-//import androidx.core.app.ActivityCompat;
 import androidx.webkit.WebViewCompat;
+//import androidx.core.app.ActivityCompat;
 //import androidx.webkit.WebResourceRequestCompat;
 //import androidx.webkit.WebSettingsCompat;
 //import androidx.webkit.WebViewClientCompat;
@@ -111,7 +112,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// Set up looks of the view
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 //		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 //			getWindow().addFlags(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
 //		}
@@ -445,14 +445,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (getWindow() != null) {
 			View decorView = getWindow().getDecorView();
 			// Hide both the navigation bar and the status bar.
-			// SYSTEM_UI_FLAG_FULLSCREEN is only available on Android 4.1 and higher, but as
+			// SYSTEM_UI_FLAG_FULLSCREEN is available from Android 4.1 (API 16) and higher, but as
 			// a general rule, you should design your app to hide the status bar whenever you
 			// hide the navigation bar.
-			int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+			// SYSTEM_UI_FLAG_HIDE_NAVIGATION is available from API level 14
+			// SYSTEM_UI_FLAG_IMMERSIVE_STICKY is available from API 18
+			int uiOptions =   View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 							| View.SYSTEM_UI_FLAG_FULLSCREEN
-							| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-							| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-							| View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+							| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
 			// Enables regular immersive mode.
 			// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
 			// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -921,6 +921,74 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+		setTouchHandling(webView);
+	}
+
+	private void setTouchHandling(WebView webView) {
+		// set long click handling to prevent text selection
+		webView.setOnLongClickListener(new View.OnLongClickListener() {
+			@Override
+			public boolean onLongClick(View v) {
+				return true;
+			}
+		});
+		webView.setLongClickable(false);
+		// set touch handling to enable touch events in the webview to allow dynamic content control
+		webView.setOnTouchListener(new View.OnTouchListener() {
+			public final static int FINGER_RELEASED = 0;
+			public final static int FINGER_TOUCHED = 1;
+			public final static int FINGER_DRAGGING = 2;
+			public final static int FINGER_UNDEFINED = 3;
+
+			private int fingerState = FINGER_RELEASED;
+
+			@Override
+			public boolean onTouch(View view, MotionEvent motionEvent) {
+				Log.i(className, "override onTouch (webView onTouchListener)");
+				switch (motionEvent.getAction()) {
+					case MotionEvent.ACTION_DOWN:
+						if (fingerState == FINGER_RELEASED) {
+							fingerState = FINGER_TOUCHED;
+							Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
+						} else {
+							fingerState = FINGER_UNDEFINED;
+							Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
+						}
+						break;
+					case MotionEvent.ACTION_UP:
+						if(fingerState != FINGER_DRAGGING) {
+							fingerState = FINGER_RELEASED;
+
+							Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
+							// handle click/touch here if the webview does not handle it correctly
+							//webView.performClick();
+							return true;
+						}
+						else if (fingerState == FINGER_DRAGGING) {
+							fingerState = FINGER_RELEASED;
+							Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
+						} else {
+							fingerState = FINGER_UNDEFINED;
+							Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
+						}
+						break;
+					case MotionEvent.ACTION_MOVE:
+						if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
+							fingerState = FINGER_DRAGGING;
+							Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
+						} else {
+							fingerState = FINGER_UNDEFINED;
+							Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
+						}
+						break;
+					default:
+						fingerState = FINGER_UNDEFINED;
+						Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
+				}
+				Log.i(className, "onTouch: return false");
+				return false;
+			}
+		});
 	}
 
 	private void storePlayerId(String value) {
