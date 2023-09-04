@@ -68,6 +68,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private long firstAvailableHeapSizeInMB = 0;
 	private Handler memoryCheckHandler = null;
 	private Runnable memoryCheckRunner = null;
+	private boolean continueMemoryCheck = true;
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	// TWA related
@@ -141,7 +142,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		requestManageOverlayPermission(getApplicationContext());
 
 		// create Trusted Web Access or fall back to a WebView
-		openBrowserView((savedInstanceState == null),
+		Log.i(className, "onCreate: create Trusted Web Access or fall back to a WebView");
+		openBrowserView(false,
 						(savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
 						retrieveOrGeneratePlayerId());
 	}
@@ -156,7 +158,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 		else if (requestCode == REQUEST_OVERLAY_PERMISSION) {
 			Log.i(className, "onActivityResult: REQUEST_OVERLAY_PERMISSION - overlay permission granted! resultCode: " + resultCode);
-			openBrowserView((currentSavedInstanceState == null),
+			openBrowserView(false,
 					(currentSavedInstanceState != null && currentSavedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
 					retrieveOrGeneratePlayerId());
 		}
@@ -429,12 +431,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		 Log.i(className,"onDestroy: Delayed restart of the application!!!");
 		 restartDelayed();
 
+		Log.i(className, "onDestroy: stopMemoryChecking");
+		this.stopMemoryChecking();
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			unBindServiceConnection();
 		} else {
 			Log.i(className, "onDestroy: connection is unbound");
 		}
+		Log.i(className, "onDestroy: destroyBrowserView");
 		this.destroyBrowserView();
 		super.onDestroy();
 		Log.i(className, "onDestroy: end");
@@ -485,11 +490,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	 * PRIVATE methods
 	 */
 	private void reportSystemInformation() {
-		Log.e(className, "*********************************************************");
-		Log.e(className, "***");
-		Log.e(className, "***  Build version: " + Build.VERSION.SDK_INT);
-		Log.e(className, "***");
-		Log.e(className, "*********************************************************");
+		Log.e(className, "***************************************");
+		Log.e(className, "***          API level: " + Build.VERSION.SDK_INT + "          ***");
+		Log.e(className, "***************************************");
 	}
 
 	private void unBindServiceConnection() {
@@ -530,6 +533,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
 		} else {
 			// fall back to WebView
+			Log.i(className, "openBrowserView chromePackage is null; fall back to WebView");
 			webView = openWebView(initialiseWebContent, playerId);
 		}
 	}
@@ -554,19 +558,36 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		//      https://developer.android.com/reference/java/lang/Runnable.html
 		//      https://developer.android.com/reference/android/os/Looper.html
 		memoryCheckHandler = new Handler();
+		continueMemoryCheck = true;
 
 		memoryCheckRunner = () -> {
 			freeMemoryWhenNeeded(analyseMemoryStatus());
-			// run again
-			memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
+			if (continueMemoryCheck) {
+				// run again
+				memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
+			}
 		 };
 		// initial run
 		memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
 	}
 
+	private void stopMemoryChecking() {
+		if (memoryCheckHandler != null) {
+			// TODO do we have to stop the callbacks, is the use of continueMemoryCheck enough?
+			continueMemoryCheck = false;
+			Log.i(className, "stopMemoryChecking remove Callbacks from memoryCheckHandler");
+			memoryCheckHandler.removeCallbacks(memoryCheckRunner);
+			Log.i(className, "stopMemoryChecking set memoryCheckHandler to null");
+			memoryCheckHandler= null;
+		}
+	}
+
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
 		WebView result = (WebView) findViewById(R.id.mainUiView);
-		Log.i(className, "openWebView; webView is " + (result == null ? "null" : "not null"));
+		Log.i(className, "openWebView; webView is " +
+						(result == null ? "null" : "not null") + ", initialiseWebContent: " +
+						(initialiseWebContent ? "true" : "false") +
+						"playerId: " + playerId);
 		setupWebView(result);
 		result.setWebChromeClient(createWebChromeClient());
 		result.setWebViewClient(createWebViewClient());
@@ -577,12 +598,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			cookieManager.setAcceptCookie(true);
 			cookieManager.setAcceptThirdPartyCookies(result, true);
 			if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-				cookieManager.setAcceptFileSchemeCookies(true);
+				CookieManager.setAcceptFileSchemeCookies(true);
 			}
 		}
-		if (initialiseWebContent) {
+		if (initialiseWebContent || currentSavedInstanceState == null) {
+			Log.i(className, "openWebView; initialising WebView");
 			result.loadDataWithBaseURL("file:///android_asset/",
-					initialHtmlPage(playerId, result.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
+							  "text/html", "UTF-8", null);
+		} else {
+			Log.i(className, "openWebView; restoring WebView from saved state");
+			result.restoreState(currentSavedInstanceState);
 		}
 
 		// Callbacks for service binding, passed to bindService()
@@ -686,8 +712,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
 				Log.i(className, "shouldOverrideUrlLoading");
-				// Return false from the callback instead of calling view.loadUrl
-				// instead. Calling loadUrl introduces a subtle bug where if you
+				// Return false from the callback instead of calling view.loadUrl.
+				// Calling loadUrl introduces a subtle bug where if you
 				// have any iframe within the page with a custom scheme URL
 				// (say <iframe src="tel:123"/>) it will navigate your app's
 				// main frame to that URL most likely breaking the app as a side effect.
@@ -800,15 +826,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			case CRITICAL:
 				// Release as much memory as the process can.
 				// ==>> restart the activity
+				Log.i(className, ".freeMemoryWhenNeeded; CRITICAL => restartActivity");
 				this.restartActivity();
 				break;
 			case LOW:
 				// Release any UI objects that currently hold memory.
 				// ==>> dump browser view and recreate it
+				Log.i(className, ".freeMemoryWhenNeeded; LOW => recreateBrowserView");
 				this.recreateBrowserView();
 			case MEDIUM:
 				// Release any memory that your app doesn't need to run.
 				// ==>> reload browser view
+				Log.i(className, ".freeMemoryWhenNeeded; MEDIUM => reloadBrowserView");
 				this.reloadBrowserView();
 				break;
 			case OK:
@@ -857,7 +886,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				.appendQueryParameter("player_id", playerId)
 				.appendQueryParameter("webview_user_agent", webviewUserAgent)
 				.appendQueryParameter("webview_version", webviewVersion)
-				.appendQueryParameter("https_required", "no")
+				.appendQueryParameter("https_required", httpsRequired())
 				.appendQueryParameter("app_version", appVersion).build()
 				.toString();
 	};
@@ -914,11 +943,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
+		// Chaching of web content:
 		// When navigating back, content is not revalidated, instead the content is just retrieved
-		// from the cache. Disable the cache to fix this, but since we do not have back
-		// navigation nor use content validation
-		// Default cache usage mode.
-		webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+		// from the cache. Disable the cache to fix this.
+		// We do not have back navigation nor use content validation
+		// * Default cache usage mode; LOAD_DEFAULT. If the navigation type doesn't impose any
+		// specific behavior, use cached resources when they are available and not expired,
+		// otherwise load resources from the network.
+		// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
+		// available, even if they have expired. Otherwise load resources from the network.
+		// Aim is to allow playback start even if there is no internet connection
+		webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
 		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 		setTouchHandling(webView);
