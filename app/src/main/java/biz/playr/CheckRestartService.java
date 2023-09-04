@@ -27,6 +27,7 @@ public class CheckRestartService extends Service {
 	private static final String className = "biz.playr.CheckRestartS";
 	// use type long since the second and third parameter for
 	// scheduleAtFixedRate is of type long
+	private static final long initialDelay = 30000; // 30 seconds in milliseconds
 	// private static final long intervalBetweenRestartChecks = 300000; // 5 minutes in milliseconds
 	private static final long intervalBetweenRestartChecks = 180000; // 3 minutes in milliseconds
 	private static final String rebootResponse = "1";
@@ -125,8 +126,8 @@ public class CheckRestartService extends Service {
 			}
 		};
 		timer = new Timer();
-		timer.scheduleAtFixedRate(task, intervalBetweenRestartChecks, intervalBetweenRestartChecks);
-		Log.i(className, ".onCreate: timer was started with delay: " + intervalBetweenRestartChecks/1000 + " (s) and interval: " + intervalBetweenRestartChecks/1000 + " (s)");
+		timer.scheduleAtFixedRate(task, initialDelay, intervalBetweenRestartChecks);
+		Log.i(className, ".onCreate: timer was started with delay: " + initialDelay/1000 + " (s) and interval: " + intervalBetweenRestartChecks/1000 + " (s)");
 
 		// To end the application
 		// Log.e(className,"onCreate: System.exit(2) !!! End application !!!");
