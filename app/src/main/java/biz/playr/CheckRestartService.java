@@ -1,5 +1,7 @@
 package biz.playr;
 
+import static android.os.SystemClock.sleep;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -110,18 +112,25 @@ public class CheckRestartService extends Service {
 					this.cancel();
 				}
 
-				// check the server if restart is needed
-				boolean restartMainActivity = checkServerForRestart();
-				if (restartMainActivity) {
-					Log.i(className, ".run: MainActivity has to be restarted");
-					if (serviceCallbacks != null) {
+				if (serviceCallbacks != null) {
+					// trigger saving of web content in MainActivity
+					Log.i(className, "############################################################");
+					Log.i(className, "###                                                      ###");
+					Log.i(className, "### .run: trigger MainActivity to save screenshot        ###");
+					Log.i(className, "###                                                      ###");
+					Log.i(className, "###########################################################");
+					serviceCallbacks.saveScreenshot();
+
+					// check the server if restart is needed
+					boolean restartMainActivity = checkServerForRestart();
+					if (restartMainActivity) {
 						Log.i(className, ".run: restarting MainActivity");
 						serviceCallbacks.restartActivityWithDelay();
 					} else {
-						Log.e(className, ".run: restarting MainActivity impossible; serviceCallbacks is null");
+						Log.i(className, ".run: MainActivity does not need to be restarted");
 					}
 				} else {
-					Log.i(className, ".run: MainActivity does not need to be restarted");
+					Log.e(className, ".run: calling methods on MainActivity impossible; serviceCallbacks is null");
 				}
 			}
 		};
