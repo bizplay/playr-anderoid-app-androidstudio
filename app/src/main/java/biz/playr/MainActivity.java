@@ -1,22 +1,34 @@
 package biz.playr;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.UUID;
+//import java.io.File;
 
-//import android.Manifest;
 import android.app.ActivityManager;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.BaseBundle;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.Parcel;
+import android.os.PersistableBundle;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.PixelCopy;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
@@ -41,6 +53,9 @@ import android.webkit.WebResourceError;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
+//import android.Manifest;
+//import android.graphics.Canvas;
+//import android.media.ThumbnailUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -56,9 +71,14 @@ import androidx.webkit.WebViewCompat;
 //import androidx.webkit.WebResourceRequestCompat;
 //import androidx.webkit.WebSettingsCompat;
 //import androidx.webkit.WebViewClientCompat;
+//import javax.net.ssl.HandshakeCompletedListener;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
+	private Bundle webViewContent = null;
+	private static final String webArchiveFileName = "WebViewWebArchive.mht";
+	private static final String screenShotFileName = "ScreenShot.jpg";
+	private static final int jpegQuality = 85;
 	private static final String className = "biz.playr.MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
@@ -69,12 +89,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private Handler memoryCheckHandler = null;
 	private Runnable memoryCheckRunner = null;
 	private boolean continueMemoryCheck = true;
+	private Handler pixelCopyHandler = null;
+	private Bitmap screenshotAsBitmap = null;
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	// TWA related
 	private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
 	private Bundle currentSavedInstanceState;
+	private PersistableBundle persistableWebViewState;
+	private String PersistenceFileName = "PersistedWebViewState";
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
@@ -84,7 +108,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-		Log.i(className, "override onCreate");
+		Log.i(className, "override onCreate, savedInstanceState: " + (savedInstanceState == null ? "null" : "not null"));
 		currentSavedInstanceState = savedInstanceState;
 		super.onCreate(savedInstanceState);
 
@@ -213,11 +237,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (mgr != null) {
 			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
+				try {
+					mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+					Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
+				} catch (SecurityException ex) {
+					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
+				}
 			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExact");
+				try {
+					mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+					Log.i(className, "restartDelayed: called setExact");
+				} catch (SecurityException ex) {
+					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
+					throw ex;
+				}
 			} else {
 				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
 				Log.i(className, "restartDelayed: called set");
@@ -296,19 +329,258 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 //		System.exit(2);
 	}
 
+	public void persistWebContent() {
+		Bundle webContent = new Bundle();
+		Log.i(className, "persistWebContent");
+
+		if (webView != null) {
+			webView.post(new Runnable() {
+				@Override
+				public void run() {
+					Log.i(className, "persistWebContent webView.post .run");
+
+//					webView.saveState(webContent);
+//					saveBundle(webContent);
+//					webViewContent = new Bundle(webContent);
+					webView.saveWebArchive(webArchiveFilePath());
+
+					Log.i(className, "persistWebContent webView.post .run done");
+				}
+			});
+		}
+	}
+	public void restoreWebContent() {
+		Log.i(className, "restoreWebContent");
+//		Bundle webContent = retrieveBundle();
+
+		if (webView != null) {
+			webView.post(new Runnable() {
+				@Override
+				public void run() {
+					Log.i(className, "restoreWebContent webView.post .run");
+					webView.loadUrl("file://" + webArchiveFilePath());
+//					webView.restoreState(webContent);
+//					webView.restoreState(webViewContent);
+					Log.i(className, "restoreWebContent webView.post .run done");
+				}
+			});
+		}
+	}
+
+	// See https://stackoverflow.com/a/49857641
+	private static PersistableBundle toPersistableBundle(Bundle bundle) {
+		if (bundle == null) {
+			return null;
+		}
+		PersistableBundle persistableBundle = null;
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+			persistableBundle = new PersistableBundle();
+			for (String key : bundle.keySet()) {
+				Object value = bundle.get(key);
+				if (isPersistableBundleType(value)) {
+					putIntoBundle(persistableBundle, key, value);
+				}
+			}
+		}
+		return persistableBundle;
+	}
+	private static Bundle toBundle(PersistableBundle persistableBundle) {
+		if (persistableBundle == null) {
+			return null;
+		}
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+			return new Bundle(persistableBundle);
+		} else {
+			return null;
+		}
+	}
+	private static boolean isPersistableBundleType(Object value) {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+			return ((value instanceof PersistableBundle) ||
+					(value instanceof Integer) || (value instanceof int[]) ||
+					(value instanceof Long) || (value instanceof long[]) ||
+					(value instanceof Double) || (value instanceof double[]) ||
+					(value instanceof String) || (value instanceof String[]) ||
+					(value instanceof Boolean) || (value instanceof boolean[])
+			);
+		} else {
+			return false;
+		}
+	}
+	private static void putIntoBundle(BaseBundle baseBundle, String key, Object value) throws IllegalArgumentException {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+			if (value == null) {
+				throw new IllegalArgumentException("Unable to determine type of null values");
+			} else if (value instanceof Integer) {
+				baseBundle.putInt(key, (int) value);
+			} else if (value instanceof int[]) {
+				baseBundle.putIntArray(key, (int[]) value);
+			} else if (value instanceof Long) {
+				baseBundle.putLong(key, (long) value);
+			} else if (value instanceof long[]) {
+				baseBundle.putLongArray(key, (long[]) value);
+			} else if (value instanceof Double) {
+				baseBundle.putDouble(key, (double) value);
+			} else if (value instanceof double[]) {
+				baseBundle.putDoubleArray(key, (double[]) value);
+			} else if (value instanceof String) {
+				baseBundle.putString(key, (String) value);
+			} else if (value instanceof String[]) {
+				baseBundle.putStringArray(key, (String[]) value);
+			} else if (value instanceof PersistableBundle) {
+				if (baseBundle instanceof PersistableBundle)
+					((PersistableBundle) baseBundle).putPersistableBundle(key, (PersistableBundle) value);
+				else if (baseBundle instanceof Bundle)
+					((Bundle) baseBundle).putBundle(key, toBundle((PersistableBundle) value));
+			} else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+				if (value instanceof Boolean) {
+					baseBundle.putBoolean(key, (boolean) value);
+				} else if (value instanceof boolean[]) {
+					baseBundle.putBooleanArray(key, (boolean[]) value);
+				}
+			} else {
+				Log.e(className, "putIntoBundle; Objects of type " + value.getClass().getSimpleName() +
+						" can not be put into a " + BaseBundle.class.getSimpleName());
+				throw new IllegalArgumentException("Objects of type " + value.getClass().getSimpleName()
+						+ " can not be put into a " + BaseBundle.class.getSimpleName());
+			}
+		}
+	}
+
+//	private PersistableBundle retrievePersistedBundle() {
+////		String persistedBundleFileName = getApplicationContext().getFilesDir().getAbsolutePath() + "/persistence/" + PersistenceFileName;
+//		Log.i(className, "retrievePersistedBundle");
+//		FileInputStream fileInputStream;
+//		PersistableBundle bundle = null;
+//		try
+//		{
+//			fileInputStream = openFileInput(PersistenceFileName);
+//			if (fileInputStream != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+//				Log.i(className, "retrievePersistedBundle readFromStream");
+//				bundle = PersistableBundle.readFromStream(fileInputStream);
+//			}
+//			fileInputStream.close();
+//			Log.i(className, "retrievePersistedBundle done");
+//		} catch (Exception ex)
+//		{
+//			Log.e(className, "PersistableBundle; Error opening persistent storage: " + ex);
+//		}
+//		return bundle;
+//	}
+	private Bundle retrieveBundle() {
+		Log.i(className, "retrieveBundle");
+		FileInputStream fileInputStream;
+		Parcel parcel = Parcel.obtain();
+		Bundle bundle = null;
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+		byte[] byteArray = new byte[1024];
+		int bytesRead = 0;
+
+		try
+		{
+			fileInputStream = openFileInput(PersistenceFileName);
+			if (fileInputStream != null) {
+				Log.i(className, "retrieveBundle; readFromFileInputStream");
+				while ((bytesRead = fileInputStream.read(byteArray)) != -1) {
+					byteArrayOutputStream.write(byteArray, 0, bytesRead);
+				}
+				byte[] data = byteArrayOutputStream.toByteArray();
+				Log.i(className, "retrieveBundle; data of length " + (data != null ? data.length : 0) + " has been read");
+				parcel.unmarshall(data, 0, data.length);
+				bundle = Bundle.CREATOR.createFromParcel(parcel);
+				Log.i(className, "retrieveBundle; data: " + (data != null && data.length > 0 ? data.toString() : "<null>"));
+				Log.i(className, "retrieveBundle; bundle: " + (bundle != null ? bundle.toString() : "<null>"));
+			}
+			fileInputStream.close();
+			Log.i(className, "retrieveBundle; done");
+		} catch (Exception ex)
+		{
+			Log.e(className, "PersistableBundle; Error opening persistent storage: " + ex);
+		}
+		return bundle;
+	}
+
+//	private void savePersistableBundle(PersistableBundle bundle) {
+////		String persistedBundleFileName = getApplicationContext().getFilesDir().getAbsolutePath() + "/persistence/" + PersistenceFileName;
+////		String dir = Environment.getExternalStorageDirectory().toString() + "/biz.playr/";
+////		File newdir = new File(dir);
+////		newdir.mkdirs();
+////		File dataFile = new File(newdir, PersistenceFileName);
+//		Log.i(className, "savePersistableBundle");
+//		FileOutputStream fileOutputStream;
+//		try
+//		{
+////			fileOutputStream = new FileOutputStream(imageFileName);
+//			fileOutputStream = openFileOutput(PersistenceFileName, MODE_PRIVATE);
+//			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+//				Log.i(className, "savePersistableBundle writeToStream");
+//				bundle.writeToStream(fileOutputStream);
+//			}
+//			fileOutputStream.flush();
+//			fileOutputStream.close();
+//			Log.i(className, "savePersistableBundle done");
+////			fileOutputStream = null;
+//		} catch (Exception ex)
+//		{
+//			Log.e(className, "savePersistableBundle; Error opening persistent storage: " + ex);
+//		}
+//	}
+	private void saveBundle(Bundle bundle) {
+		Log.i(className, "saveBundle");
+		FileOutputStream fileOutputStream;
+		Parcel parcel = Parcel.obtain();
+		try
+		{
+			fileOutputStream = openFileOutput(PersistenceFileName, MODE_PRIVATE);
+			bundle.writeToParcel(parcel, 0);
+			byte[] data = parcel.marshall();
+			fileOutputStream.write(data);
+			fileOutputStream.flush();
+			fileOutputStream.close();
+			Log.i(className, "saveBundle; bundle was written, data length: " + (data != null ? data.length : 0));
+			Log.i(className, "saveBundle; data: " + (data != null && data.length > 0 ? data.toString() : "<null>"));
+			Log.i(className, "saveBundle; bundle: " + (bundle != null ? bundle.toString() : "<null>"));
+		} catch (Exception ex)
+		{
+			Log.e(className, "saveBundle; Error opening persistent storage: " + ex);
+		}
+	}
+	private void saveWebViewContent() {
+		if (webView != null) {
+			webView.saveWebArchive(webArchiveFilePath());
+		}
+	}
+
+
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
-		Log.i(className, "override onSaveInstanceState");
-		super.onSaveInstanceState(outState);
+		Log.i(className, "#######################################################");
+		Log.i(className, "####                                                ###");
+		Log.i(className, "####                                                ###");
+		Log.i(className, "override onSaveInstanceState, outState: " + (outState == null ? "null" : "not null"));
+		Log.i(className, "####                                                ###");
+		Log.i(className, "####                                                ###");
+		Log.i(className, "#######################################################");
 		if (webView != null) { webView.saveState(outState); }
 		outState.putBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY, this.twaWasLaunched);
+		super.onSaveInstanceState(outState);
 	}
 
 	@Override
 	protected void onRestoreInstanceState(Bundle savedInstanceState) {
-		Log.i(className, "override onRestoreInstanceState");
+		Log.i(className, "################################################################");
+		Log.i(className, "####                                                         ###");
+		Log.i(className, "####                                                         ###");
+		Log.i(className, "override onRestoreInstanceState, savedInstanceState: " + (savedInstanceState == null ? "null" : "not null"));
+		Log.i(className, "####                                                         ###");
+		Log.i(className, "####                                                         ###");
+		Log.i(className, "################################################################");
 		super.onRestoreInstanceState(savedInstanceState);
 		if (savedInstanceState != null && !savedInstanceState.isEmpty()) {
+			if (currentSavedInstanceState == null) {
+				Log.i(className, ".onRestoreInstanceState, set currentSavedInstanceState");
+				currentSavedInstanceState = savedInstanceState;
+			}
 			if (webView != null) { webView.restoreState(savedInstanceState); }
 			this.twaWasLaunched = savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY);
 		}
@@ -587,7 +859,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "openWebView; webView is " +
 						(result == null ? "null" : "not null") + ", initialiseWebContent: " +
 						(initialiseWebContent ? "true" : "false") +
-						"playerId: " + playerId);
+						", playerId: " + playerId);
 		setupWebView(result);
 		result.setWebChromeClient(createWebChromeClient());
 		result.setWebViewClient(createWebViewClient());
@@ -601,15 +873,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				CookieManager.setAcceptFileSchemeCookies(true);
 			}
 		}
-		if (initialiseWebContent || currentSavedInstanceState == null) {
-			Log.i(className, "openWebView; initialising WebView");
-			result.loadDataWithBaseURL("file:///android_asset/",
-										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
-							  "text/html", "UTF-8", null);
-		} else {
-			Log.i(className, "openWebView; restoring WebView from saved state");
-			result.restoreState(currentSavedInstanceState);
-		}
+//		if (initialiseWebContent || currentSavedInstanceState == null || currentSavedInstanceState.isEmpty()) {
+//			Log.i(className, "openWebView; initialising WebView");
+//			result.loadDataWithBaseURL("file:///android_asset/",
+//										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
+//							  "text/html", "UTF-8", null);
+//		} else {
+//			Log.i(className, "openWebView; restoring WebView from saved state");
+//			result.restoreState(currentSavedInstanceState);
+//		}
 
 		// Callbacks for service binding, passed to bindService()
 		serviceConnection = new ServiceConnection() {
@@ -621,7 +893,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				Log.i(className, "override onServiceConnected");
 				// cast the IBinder and get CheckRestartService instance
 				// service is an android.os.BinderProxy
-				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+				CheckRestartService.LocalBinder binder = (CheckRestartService.LocalBinder) service;
 				checkRestartService = binder.getService();
 //				service.isBinderAlive();
 				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
@@ -636,9 +908,228 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				bound = false;
 			}
 		};
+
+////		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+//			Bundle persistedWebViewContent = retrieveBundle();
+//			Log.i(className, "openWebView; persistedWebViewContent: " + (persistedWebViewContent == null ? "null" : "not null") + ", persistedWebViewContent: " + (persistedWebViewContent != null && !persistedWebViewContent.isEmpty() ? "not empty" : "empty"));
+//			if (initialiseWebContent || persistedWebViewContent == null || persistedWebViewContent.isEmpty()) {
+//				Log.i(className, "openWebView; initialising WebView");
+////				result.loadUrl("http://playr.biz/1160/84");
+//				result.loadDataWithBaseURL("file:///android_asset/",
+//											initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
+//								  "text/html", "UTF-8", null);
+//			} else {
+//				Log.i(className, "openWebView; restoring WebView from saved state");
+//				result.restoreState(persistedWebViewContent);
+//			}
+////		} else {
+////			Log.i(className, "openWebView; API level < lollipop, initialising WebView");
+//////			result.loadUrl("http://playr.biz/1160/84");
+////			result.loadUrl("https://nu.nl");
+////		}
+////		persistWebContent();
+
+		if (isNetworkAvailable() && isServerAvailable()) {
+			Log.i(className, "openWebView; initialising WebView");
+			result.loadDataWithBaseURL("file:///android_asset/",
+										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
+							  "text/html", "UTF-8", null);
+		} else {
+//			Log.i(className, "openWebView; restoring WebView from web archive");
+//			result.loadUrl("file://" + webArchiveFilePath());
+
+			Log.i(className, "openWebView; restoring WebView from screenshot");
+//			try {
+//				FileInputStream fileInputStream = openFileInput(screenShotFileName);
+//				result.loadData(fileInputStream.toString(), "images/*", "UTF-8");
+//				openScreenshot();
+//			} catch (Exception ex) {
+//			}
+			result.loadUrl("file://" + screenShotFilePath());
+		}
 		return result;
 	}
+	private String webArchiveFilePath() {
+		return getFilesDir() + "/" + webArchiveFileName;
+	}
+	private boolean isNetworkAvailable() {
+		ConnectivityManager connectivityManager = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
 
+		// API level 29 or higher
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.getActiveNetwork());
+			if (capabilities == null) return false;
+			if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return true;
+			if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return true;
+			if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return true;
+		}
+		// API level below 29
+		else {
+			NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+			return activeNetworkInfo != null && activeNetworkInfo.isConnectedOrConnecting();
+		}
+		return false;
+	}
+	private boolean isServerAvailable() {
+		//TODO check our server  using test image or ajax call
+		return true;
+	}
+//	following two methods were found here: https://stackoverflow.com/a/5651242
+//	private void takeScreenshot() {
+//		Date now = new Date();
+//		android.text.format.DateFormat.format("yyyy-MM-dd_hh:mm:ss", now);
+//
+//		try {
+//			// image naming and path  to include sd card  appending name you choose for file
+//			String mPath = Environment.getExternalStorageDirectory().toString() + "/" + now + ".jpg";
+//
+//			// create bitmap screen capture
+//			View v1 = getWindow().getDecorView().getRootView();
+//			v1.setDrawingCacheEnabled(true);
+//			Bitmap bitmap = Bitmap.createBitmap(v1.getDrawingCache());
+//			v1.setDrawingCacheEnabled(false);
+//
+//			File imageFile = new File(mPath);
+//
+//			FileOutputStream outputStream = new FileOutputStream(imageFile);
+//			int quality = 100;
+//			bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream);
+//			outputStream.flush();
+//			outputStream.close();
+//
+//			openScreenshot(imageFile);
+//		} catch (Throwable e) {
+//			// Several error may come out with file handling or DOM
+//			e.printStackTrace();
+//		}
+//	}
+//	private void openScreenshot(File imageFile) {
+//		Intent intent = new Intent();
+//		intent.setAction(Intent.ACTION_VIEW);
+//		Uri uri = Uri.fromFile(imageFile);
+//		intent.setDataAndType(uri, "image/*");
+//		startActivity(intent);
+//	}
+// following code for converting a bitmap to a byte array (which can be persisted
+// using a FileOutputStream) was found here: https://stackoverflow.com/a/34165515
+// *** Bitmap to Byte-array
+// int size = bitmap.getRowBytes() * bitmap.getHeight();
+// ByteBuffer byteBuffer = ByteBuffer.allocate(size);
+// bitmap.copyPixelsToBuffer(byteBuffer);
+// byte[] byteArray = byteBuffer.array();
+//
+//// Somehow save (and later load) these as well:
+// int width = bitmap.getWidth();
+// int height = bitmap.getHeight();
+// String format = bitmap.getConfig().name();
+// *** Byte-array to Bitmap
+// Bitmap.Config configBmp = Bitmap.Config.valueOf(format);
+// Bitmap bitmap_tmp = Bitmap.createBitmap(width, height, configBmp);
+// ByteBuffer buffer = ByteBuffer.wrap(byteArray);
+// bitmap_tmp.copyPixelsFromBuffer(buffer);
+
+//	private void saveScreenshot() {
+	public void saveScreenshot() {
+//		FileOutputStream fileOutputStream;
+//		try {
+			// create bitmap screen capture
+			View view = getWindow().getDecorView().getRootView();
+
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				// This method of screenshot creation will also show video content
+				Bitmap.Config config = Bitmap.Config.ARGB_8888;
+				screenshotAsBitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), config);
+				if (pixelCopyHandler == null) {pixelCopyHandler = new Handler(Looper.getMainLooper()); }
+				Log.e(className, ".saveScreenshot; doing PixelCopy.request...");
+				PixelCopy.request(getWindow(), screenshotAsBitmap, new PixelCopyFinishedProcessor(), pixelCopyHandler);
+			} else {
+				// This method of screenshot creation will work on older versions of Android
+				// but it will NOT capture video content
+				try {
+					view.setDrawingCacheEnabled(true);
+					screenshotAsBitmap = Bitmap.createBitmap(view.getDrawingCache());
+					view.setDrawingCacheEnabled(false);
+					FileOutputStream fileOutputStream = openFileOutput(screenShotFileName, MODE_PRIVATE);
+					// alternatively: bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream);
+					screenshotAsBitmap.compress(Bitmap.CompressFormat.JPEG, jpegQuality, fileOutputStream);
+					fileOutputStream.flush();
+					fileOutputStream.close();
+				} catch (Throwable ex) {
+					Log.e(className, "saveScreenshot; Error during creating a screenshot file: " + ex);
+					//		ex.printStackTrace();
+				}
+			}
+
+//			Bitmap newBitmap = ThumbnailUtils.extractThumbnail(bitmap, bitmap.getWidth(), bitmap.getHeight());
+
+//			File imageFile = new File(screenShotFilePath());
+//			FileOutputStream fileOutputStream = new FileOutputStream(imageFile);
+			// remove existing screenshot
+//			File file = new File(screenShotFileName);
+//			if (file.exists()) {
+//				if (file.delete()) {
+//					Log.i(className, "saveScreenshot; delete Screenshot file was successful");
+//				} else {
+//					Log.e(className, "saveScreenshot; delete Screenshot file was NOT successful");
+//				}
+//			} else {
+//				Log.w(className, "saveScreenshot; Screenshot file was not found");
+//			}
+//			boolean success = deleteFile(screenShotFileName);
+//			Log.w(className, "saveScreenshot; Screenshot file was " + (success ? "deleted" : "NOT deleted"));
+
+//			fileOutputStream = openFileOutput(screenShotFileName, MODE_PRIVATE);
+//			// alternatively: bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream);
+//			screenshotAsBitmap.compress(Bitmap.CompressFormat.JPEG, jpegQuality, fileOutputStream);
+//			fileOutputStream.flush();
+//			fileOutputStream.close();
+// show the bitmap...
+//			Canvas canvas = new Canvas(bitmap);
+//		} catch (Throwable ex) {
+//			Log.e(className, "saveScreenshot; Error during creating a screenshot file: " + ex);
+//	//		ex.printStackTrace();
+//		}
+	}
+
+	@RequiresApi(api = Build.VERSION_CODES.N)
+	private class PixelCopyFinishedProcessor implements PixelCopy.OnPixelCopyFinishedListener {
+		private static final String className = "biz.playr.PixelCopyFini";
+
+		// copyResult Contains the resulting status of the copy request. This will either be
+		// PixelCopy#SUCCESS or one of the PixelCopy.ERROR_* values.
+		// Value is PixelCopy.SUCCESS, PixelCopy.ERROR_UNKNOWN, PixelCopy.ERROR_TIMEOUT,
+		// PixelCopy.ERROR_SOURCE_NO_DATA, PixelCopy.ERROR_SOURCE_INVALID, or
+		// PixelCopy.ERROR_DESTINATION_INVALID
+		public void	onPixelCopyFinished(int copyResult) {
+			Log.i(className, ".onPixelCopyFinished start");
+			if (copyResult == PixelCopy.SUCCESS) {
+				try {
+					FileOutputStream fileOutputStream = openFileOutput(screenShotFileName, MODE_PRIVATE);
+					// alternatively: bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream);
+					screenshotAsBitmap.compress(Bitmap.CompressFormat.JPEG, jpegQuality, fileOutputStream);
+					fileOutputStream.flush();
+					fileOutputStream.close();
+				} catch (Exception ex) {
+					Log.e(className, ".onPixelCopyFinished; Error in file io: " + ex);
+				}
+			} else {
+				Log.e(className, ".onPixelCopyFinished: PixelCopy returned the error: " + copyResult);
+			}
+			Log.i(className, ".onPixelCopyFinished done");
+		}
+	}
+//	private void openScreenshot() {
+	public void openScreenshot() {
+		Intent intent = new Intent();
+		intent.setAction(Intent.ACTION_VIEW);
+		intent.setDataAndType(Uri.parse("file://" + screenShotFilePath()), "image/*");
+//		intent.setDataAndType(Uri.parse("content://" + screenShotFileName), "image/*");
+		startActivity(intent);
+	}
+	private String screenShotFilePath() {
+//		return getFilesDir() + "/" + screenShotFileName;
+		return getFileStreamPath(screenShotFileName).getAbsolutePath();
+	}
 	private void requestManageOverlayPermission(Context context) {
 		// currently (players using Android 11 and 12 in production) it
 		// seems not necessary to request the overlay permission
@@ -774,8 +1265,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	};
 
 	private String initialHtmlPage(String playerId, String webviewUserAgent) {
-		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
+// PRODUCTION
+//		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
+//				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
+// TEST, light channel
+		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location=\"http://playr.biz/1160/79410\" </script><head><body/></html>";
+// TEST, heavy channel
+//		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location=\"http://playr.biz/1160/84\" </script><head><body/></html>";
 	};
 
 	// We use the ActivityManager.MemoryInfo.threshold: The threshold of availMem at which we consider
@@ -803,8 +1299,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
 				"***************************************************************************************");
 		return result;
-
-
 	}
 
 	private MemoryStatus calculateMemoryStatus(long availableMemory, long threshold) {
@@ -943,7 +1437,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
-		// Chaching of web content:
+		// Caching of web content:
 		// When navigating back, content is not revalidated, instead the content is just retrieved
 		// from the cache. Disable the cache to fix this.
 		// We do not have back navigation nor use content validation
@@ -954,6 +1448,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// available, even if they have expired. Otherwise load resources from the network.
 		// Aim is to allow playback start even if there is no internet connection
 		webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+		webSettings.setDomStorageEnabled(true);
+		// deprecated
+		// webSettings.setAppCachePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/cache");
+		webSettings.setDatabaseEnabled(true);
+		// deprecated
+		// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
 		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 		setTouchHandling(webView);
