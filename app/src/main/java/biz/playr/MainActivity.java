@@ -1,10 +1,12 @@
 package biz.playr;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.UUID;
-//import java.io.File;
 
 import android.app.ActivityManager;
 import android.app.UiModeManager;
@@ -551,7 +553,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
-
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
 		Log.i(className, "#######################################################");
@@ -873,15 +874,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				CookieManager.setAcceptFileSchemeCookies(true);
 			}
 		}
-//		if (initialiseWebContent || currentSavedInstanceState == null || currentSavedInstanceState.isEmpty()) {
-//			Log.i(className, "openWebView; initialising WebView");
-//			result.loadDataWithBaseURL("file:///android_asset/",
-//										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
-//							  "text/html", "UTF-8", null);
-//		} else {
-//			Log.i(className, "openWebView; restoring WebView from saved state");
-//			result.restoreState(currentSavedInstanceState);
-//		}
 
 		// Callbacks for service binding, passed to bindService()
 		serviceConnection = new ServiceConnection() {
@@ -929,24 +921,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 ////		}
 ////		persistWebContent();
 
-		if (isNetworkAvailable() && isServerAvailable()) {
-			Log.i(className, "openWebView; initialising WebView");
-			result.loadDataWithBaseURL("file:///android_asset/",
-										initialHtmlPage(playerId, result.getSettings().getUserAgentString()),
-							  "text/html", "UTF-8", null);
-		} else {
-//			Log.i(className, "openWebView; restoring WebView from web archive");
-//			result.loadUrl("file://" + webArchiveFilePath());
-
-			Log.i(className, "openWebView; restoring WebView from screenshot");
-//			try {
-//				FileInputStream fileInputStream = openFileInput(screenShotFileName);
-//				result.loadData(fileInputStream.toString(), "images/*", "UTF-8");
-//				openScreenshot();
-//			} catch (Exception ex) {
-//			}
-			result.loadUrl("file://" + screenShotFilePath());
-		}
+		Log.i(className, "openWebView; initialising WebView, isNetworkAvailable: " + isNetworkAvailable() + ", isServerAvailable: " + isServerAvailable() + ", isScreenshotAvailable: " + isScreenshotAvailable() + ", isScreenshotRecent: " + isScreenshotRecent());
+		result.loadDataWithBaseURL("file:///android_asset/",
+									initialHtmlPage(playerId, result.getSettings().getUserAgentString(), !isNetworkAvailable() && isScreenshotAvailable() && isScreenshotRecent()),
+						  "text/html", "UTF-8", null);
 		return result;
 	}
 	private String webArchiveFilePath() {
@@ -971,9 +949,84 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		return false;
 	}
 	private boolean isServerAvailable() {
-		//TODO check our server  using test image or ajax call
 		return true;
+//		HttpURLConnection urlConnection = null;
+//		String response = null;
+//
+//		try {
+//			URL url = new URL(Uri.parse("https://www.playr.biz/playr_loader_test_image.png").buildUpon()
+//								.appendQueryParameter("ts", String.valueOf(System.currentTimeMillis())).build().toString());
+//			Log.i(className, ".isServerAvailable; url: " + url);
+//			urlConnection = (HttpURLConnection) url.openConnection();
+//			InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
+//			response = readStream(inputStream).trim();
+//		} catch (MalformedURLException e) {
+//			Log.e(className, ".isServerAvailable; malformed URL exception opening connection; " + e.getMessage());
+//		} catch (IOException e) {
+//			Log.e(className, ".isServerAvailable; IO exception opening connection; " + e.getMessage());
+//		} finally {
+//			if (urlConnection != null) {
+//				urlConnection.disconnect();
+//			}
+//		}
+//		return (response != null && response.length() > 0);
 	}
+//	private String readStream(InputStream inputStream) {
+//		try {
+//			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+//			StringBuilder total = new StringBuilder(inputStream.available());
+//			String line;
+//			while ((line = reader.readLine()) != null) {
+//				total.append(line).append('\n');
+//			}
+//
+//			return total.toString();
+//		} catch (IOException e) {
+//			Log.e(className, ".readStream: IO exception reading inputStream; " + e.getMessage());
+//		}
+//		return "";
+//	}
+
+	private boolean isScreenshotAvailable() {
+		File file = new File(screenShotFilePath());
+		Log.i(className, ".isScreenshotAvailable; file: " + (file == null ? "null" : "not null") + ", file.exists: " + file.exists());
+		return file.exists();
+	}
+	private Date lastModifiedDateScreenshotFile() {
+		if (isScreenshotAvailable()) {
+			File file = new File(screenShotFilePath());
+			return new Date(file.lastModified());
+		} else {
+			return null;
+		}
+	}
+	private boolean isScreenshotRecent(){
+		Calendar twoHoursAgo = Calendar.getInstance();
+		twoHoursAgo.add(Calendar.HOUR, -2);
+		Date twoHoursAgoDate = twoHoursAgo.getTime();
+
+		Calendar lastModified = Calendar.getInstance();
+		Date lastModifiedFileDate = lastModifiedDateScreenshotFile();
+		if (lastModifiedFileDate == null) { return false; }
+		lastModified.setTime(lastModifiedFileDate);
+		Date lastModifiedDate = lastModified.getTime();
+
+		return twoHoursAgoDate.before(lastModifiedDate);
+	}
+	private Calendar twoHoursBefore(Calendar dateTime) {
+//		dateTime.add();
+//		Calendar twoHoursAgo = Calendar.getInstance();
+//		if (dateTime.get(Calendar.HOUR_OF_DAY)) > 2
+//		twoHoursAgo.set(dateTime.get(Calendar.YEAR),
+//						dateTime.get(Calendar.MONTH),
+//						dateTime.get(Calendar.DATE),
+//						(dateTime.get(Calendar.HOUR_OF_DAY) - 2),
+//						dateTime.get(Calendar.MINUTE),
+//						dateTime.get(Calendar.SECOND));
+		return Calendar.getInstance();
+	}
+
+
 //	following two methods were found here: https://stackoverflow.com/a/5651242
 //	private void takeScreenshot() {
 //		Date now = new Date();
@@ -1264,12 +1317,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		};
 	};
 
-	private String initialHtmlPage(String playerId, String webviewUserAgent) {
+	private String initialHtmlPage(String playerId, String webviewUserAgent, boolean includeScreenshot) {
 // PRODUCTION
-//		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-//				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
+		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
+				+ pageUrl(playerId, webviewUserAgent, includeScreenshot) + "\"</script><head><body/></html>";
 // TEST, light channel
-		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location=\"http://playr.biz/1160/79410\" </script><head><body/></html>";
+//		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location=\"http://playr.biz/1160/79410\" </script><head><body/></html>";
 // TEST, heavy channel
 //		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location=\"http://playr.biz/1160/84\" </script><head><body/></html>";
 	};
@@ -1341,12 +1394,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
-	private String pageUrl(String playerId, String webviewUserAgent) {
+	private String pageUrl(String playerId, String webviewUserAgent, boolean includeScreenshot) {
 		String webviewVersion = "Android System WebView not installed";
 		String appVersion = "app version not found";
 		PackageManager pm = getPackageManager();
 		PackageInfo pi;
 		PackageInfo pi2;
+		Log.i(className, "pageUrl; player_id: " + playerId + ", includeScreenshot: " + includeScreenshot);
 		try {
 			pi = pm.getPackageInfo("com.google.android.webview", 0);
 			if (pi != null) {
@@ -1376,13 +1430,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.e(className, getPackageName() + " is not found");
 		}
 		// ignore preference of the OS for use of https
-		return Uri.parse("playr_loader.html").buildUpon()
-				.appendQueryParameter("player_id", playerId)
-				.appendQueryParameter("webview_user_agent", webviewUserAgent)
-				.appendQueryParameter("webview_version", webviewVersion)
-				.appendQueryParameter("https_required", httpsRequired())
-				.appendQueryParameter("app_version", appVersion).build()
-				.toString();
+		if (includeScreenshot) {
+			return Uri.parse("playr_loader.html").buildUpon()
+					.appendQueryParameter("player_id", playerId)
+					.appendQueryParameter("webview_user_agent", webviewUserAgent)
+					.appendQueryParameter("webview_version", webviewVersion)
+					.appendQueryParameter("https_required", httpsRequired())
+					.appendQueryParameter("screenshot_path", ("file://" + screenShotFilePath()))
+					.appendQueryParameter("app_version", appVersion).build()
+					.toString();
+		} else {
+			return Uri.parse("playr_loader.html").buildUpon()
+					.appendQueryParameter("player_id", playerId)
+					.appendQueryParameter("webview_user_agent", webviewUserAgent)
+					.appendQueryParameter("webview_version", webviewVersion)
+					.appendQueryParameter("https_required", httpsRequired())
+					.appendQueryParameter("app_version", appVersion).build()
+					.toString();
+		}
 	};
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
@@ -1430,9 +1495,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 		webSettings.setLoadWithOverviewMode(true);
 		webSettings.setUseWideViewPort(true);
+		webSettings.setAllowContentAccess(true);
 		webSettings.setAllowFileAccess(true);
-		// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
+		webSettings.setAllowFileAccessFromFileURLs(true);
 		webSettings.setAllowUniversalAccessFromFileURLs(true);
+		webSettings.setLoadsImagesAutomatically(true);
+		webSettings.setBlockNetworkImage(false);
+		webSettings.setTextZoom(100);
+		webSettings.setMediaPlaybackRequiresUserGesture(false);
+		// TODO check if these font related settings are needed to ensure correct font rendering
+		//webSettings.setDefaultFixedFontSize();
+		//webSettings.setDefaultFontSize();
+		//webSettings.setMinimumFontSize();
+		//webSettings.setMinimumLogicalFontSize();
+		// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
 		webSettings.setBuiltInZoomControls(false);
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
