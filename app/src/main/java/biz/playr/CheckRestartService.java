@@ -29,7 +29,7 @@ public class CheckRestartService extends Service {
 	private static final String className = "biz.playr.CheckRestartS";
 	// use type long since the second and third parameter for
 	// scheduleAtFixedRate is of type long
-	private static final long initialDelay = 30000; // 30 seconds in milliseconds
+	private static final long initialDelay = 60000; // 60 seconds in milliseconds
 	// private static final long intervalBetweenRestartChecks = 300000; // 5 minutes in milliseconds
 	private static final long intervalBetweenRestartChecks = 180000; // 3 minutes in milliseconds
 	private static final String rebootResponse = "1";
@@ -118,7 +118,7 @@ public class CheckRestartService extends Service {
 					Log.i(className, "###                                                      ###");
 					Log.i(className, "### .run: trigger MainActivity to save screenshot        ###");
 					Log.i(className, "###                                                      ###");
-					Log.i(className, "###########################################################");
+					Log.i(className, "############################################################");
 					serviceCallbacks.saveScreenshot();
 
 					// check the server if restart is needed
@@ -187,7 +187,9 @@ public class CheckRestartService extends Service {
 			} catch (IOException e) {
 				Log.e(className, ".checkServerForRestart: IO exception opening connection; " + e.getMessage());
 			} finally {
-				urlConnection.disconnect();
+				if (urlConnection != null) {
+					urlConnection.disconnect();
+				}
 			}
 			Log.i(className, ".checkServerForRestart response: " + response);
 		} else {
