@@ -68,6 +68,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private long firstAvailableHeapSizeInMB = 0;
 	private Handler memoryCheckHandler = null;
 	private Runnable memoryCheckRunner = null;
+	private boolean continueMemoryCheck = true;
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	// TWA related
@@ -211,14 +212,20 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (mgr != null) {
 			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
-			} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-				mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called setExact");
+				try {
+					mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+					Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
+				} catch (SecurityException ex) {
+					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
+				}
 			} else {
-				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-				Log.i(className, "restartDelayed: called set");
+				try {
+					mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+					Log.i(className, "restartDelayed: called setExact");
+				} catch (SecurityException ex) {
+					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
+					throw ex;
+				}
 			}
 		}
 		Log.i(className, "restartDelayed: end");
@@ -429,12 +436,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		 Log.i(className,"onDestroy: Delayed restart of the application!!!");
 		 restartDelayed();
 
+		Log.i(className, "onDestroy: stopMemoryChecking");
+		this.stopMemoryChecking();
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			unBindServiceConnection();
 		} else {
 			Log.i(className, "onDestroy: connection is unbound");
 		}
+		Log.i(className, "onDestroy: destroyBrowserView");
 		this.destroyBrowserView();
 		super.onDestroy();
 		Log.i(className, "onDestroy: end");
@@ -485,11 +495,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	 * PRIVATE methods
 	 */
 	private void reportSystemInformation() {
-		Log.e(className, "*********************************************************");
-		Log.e(className, "***");
-		Log.e(className, "***  Build version: " + Build.VERSION.SDK_INT);
-		Log.e(className, "***");
-		Log.e(className, "*********************************************************");
+		Log.e(className, "***************************************");
+		Log.e(className, "***          API level: " + Build.VERSION.SDK_INT + "          ***");
+		Log.e(className, "***************************************");
 	}
 
 	private void unBindServiceConnection() {
@@ -554,14 +562,28 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		//      https://developer.android.com/reference/java/lang/Runnable.html
 		//      https://developer.android.com/reference/android/os/Looper.html
 		memoryCheckHandler = new Handler();
+		continueMemoryCheck = true;
 
 		memoryCheckRunner = () -> {
 			freeMemoryWhenNeeded(analyseMemoryStatus());
-			// run again
-			memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
-		 };
+			if (continueMemoryCheck) {
+				// run again
+				memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
+			}
+		};
 		// initial run
 		memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
+	}
+
+	private void stopMemoryChecking() {
+		if (memoryCheckHandler != null) {
+			// TODO do we have to stop the callbacks, is the use of continueMemoryCheck enough?
+			continueMemoryCheck = false;
+			Log.i(className, "stopMemoryChecking remove Callbacks from memoryCheckHandler");
+			memoryCheckHandler.removeCallbacks(memoryCheckRunner);
+			Log.i(className, "stopMemoryChecking set memoryCheckHandler to null");
+			memoryCheckHandler= null;
+		}
 	}
 
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
@@ -800,15 +822,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			case CRITICAL:
 				// Release as much memory as the process can.
 				// ==>> restart the activity
+				Log.i(className, ".freeMemoryWhenNeeded; CRITICAL => restartActivity");
 				this.restartActivity();
 				break;
 			case LOW:
 				// Release any UI objects that currently hold memory.
 				// ==>> dump browser view and recreate it
+				Log.i(className, ".freeMemoryWhenNeeded; LOW => recreateBrowserView");
 				this.recreateBrowserView();
 			case MEDIUM:
 				// Release any memory that your app doesn't need to run.
 				// ==>> reload browser view
+				Log.i(className, ".freeMemoryWhenNeeded; MEDIUM => reloadBrowserView");
 				this.reloadBrowserView();
 				break;
 			case OK:
@@ -907,18 +932,41 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 		webSettings.setLoadWithOverviewMode(true);
 		webSettings.setUseWideViewPort(true);
+		webSettings.setAllowContentAccess(true);
 		webSettings.setAllowFileAccess(true);
-		// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
+		webSettings.setAllowFileAccessFromFileURLs(true);
 		webSettings.setAllowUniversalAccessFromFileURLs(true);
+		webSettings.setLoadsImagesAutomatically(true);
+		webSettings.setBlockNetworkImage(false);
+		webSettings.setTextZoom(100);
+		webSettings.setMediaPlaybackRequiresUserGesture(false);
+		// TODO check if these font related settings are needed to ensure correct font rendering
+		//webSettings.setDefaultFixedFontSize();
+		//webSettings.setDefaultFontSize();
+		//webSettings.setMinimumFontSize();
+		//webSettings.setMinimumLogicalFontSize();
+		// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
 		webSettings.setBuiltInZoomControls(false);
 		webSettings.setSupportZoom(false);
 		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 		// webSettings.setPluginState(PluginState.ON);
+		// Caching of web content:
 		// When navigating back, content is not revalidated, instead the content is just retrieved
-		// from the cache. Disable the cache to fix this, but since we do not have back
-		// navigation nor use content validation
-		// Default cache usage mode.
-		webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+		// from the cache. Disable the cache to fix this.
+		// We do not have back navigation nor use content validation
+		// * Default cache usage mode; LOAD_DEFAULT. If the navigation type doesn't impose any
+		// specific behavior, use cached resources when they are available and not expired,
+		// otherwise load resources from the network.
+		// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
+		// available, even if they have expired. Otherwise load resources from the network.
+		// Aim is to allow playback start even if there is no internet connection
+		webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+		webSettings.setDomStorageEnabled(true);
+		// deprecated
+		// webSettings.setAppCachePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/cache");
+		webSettings.setDatabaseEnabled(true);
+		// deprecated
+		// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
 		webView.resumeTimers();
 		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 		setTouchHandling(webView);
