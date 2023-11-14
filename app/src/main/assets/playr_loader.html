@@ -29,7 +29,7 @@
       "use strict";
       displayInformation();
       // Append Date param to ensure cache bypass
-      var url = "https://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
+      var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
       try {
         var request = httpRequest();
         if (request === undefined || request === null) { showStatus("Error", "No http-request could be created", "error"); }
