@@ -706,53 +706,69 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		return new WebViewClient() {
 			private static final String className = "biz.playr.WebViewClient";
 
+			// Documentation says: Note: Do not call WebView#loadUrl(String) with the request's
+			// URL and then return true. This unnecessarily cancels the current load and starts
+			// a new load with the same URL. The correct way to continue loading a given URL is
+			// to simply return false, without calling WebView#loadUrl(String).
+			// http://stackoverflow.com/questions/4066438/android-webview-how-to-handle-redirects-in-app-instead-of-opening-a-browser
+			// Return false from the callback instead of calling view.loadUrl
+			// instead. Calling loadUrl introduces a subtle bug where if you
+			// have any iframe within the page with a custom scheme URL
+			// (say <iframe src="tel:123"/>) it will navigate your app's
+			// main frame to that URL most likely breaking the app as a side effect.
+			public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+				Log.i(className, "shouldOverrideUrlLoading");
+				return false; // then it is not handled by default action
+			}
+			// This version of this method is deprecated from API level 24
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
 				Log.i(className, "shouldOverrideUrlLoading");
-				// Return false from the callback instead of calling view.loadUrl
-				// instead. Calling loadUrl introduces a subtle bug where if you
-				// have any iframe within the page with a custom scheme URL
-				// (say <iframe src="tel:123"/>) it will navigate your app's
-				// main frame to that URL most likely breaking the app as a side effect.
-				// http://stackoverflow.com/questions/4066438/android-webview-how-to-handle-redirects-in-app-instead-of-opening-a-browser
 				return false; // then it is not handled by default action
 			}
 
-			/*
-			 * this version of this method is deprecated from API version 23
-			 */
+			// This version of this method is added in API level 23
+			@Override
+			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+				// Log.i(className, "override onReceivedError");
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
+					Log.e(className, "onReceivedError: WebView(Client) error - " + error.getDescription()
+							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
+				}
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					if ("net::".equals(error.getDescription().subSequence(0,5))) {
+						if (error.getErrorCode() == WebViewClient.ERROR_TOO_MANY_REQUESTS || error.getErrorCode() == WebViewClient.ERROR_REDIRECT_LOOP) {
+							// escalate since app will freeze with these errors
+							super.onReceivedError(view, request, error);
+						} else {
+							// ignore other network errors
+							// super.onReceivedError(view, request, error);
+						}
+					} else {
+						Log.e(className, "===>>> onReceivedError Reloading WebView !!!");
+						// super.onReceivedError(view, request, error);
+						view.reload();
+					}
+				}
+			}
+			// This version of this method is deprecated from API version 23
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
 				// Log.i(className, "override onReceivedError");
 				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
 				Log.e(className, "onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
 				if ("net::".equals(description.subSequence(0,5))) {
-					// ignore network errors
-				} else {
-					Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-					// super.onReceivedError(view, request, error);
-					view.reload();
-				}
-			}
-
-			/*
-			 * Added in API level 23 (use these when we set android:targetSdkVersion to 23)
-			 */
-			@Override
-			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-				// Log.i(className, "override onReceivedError");
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
-					Log.e(className, "onReceivedError: WebView error - " + error.getDescription()
-							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
-				}
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					if ("net::".equals(error.getDescription().subSequence(0,5))) {
-						// ignore network errors
+					if (errorCode == WebViewClient.ERROR_TOO_MANY_REQUESTS || errorCode == WebViewClient.ERROR_REDIRECT_LOOP) {
+						// escalate since app will freeze with these errors
+						super.onReceivedError(view, errorCode, description, failingUrl);
 					} else {
-						Log.e(className, "===>>> !!! WebViewClient.onReceivedError Reloading Webview !!! <<<===");
-						// super.onReceivedError(view, request, error);
-						view.reload();
+						// ignore other network errors
+						// super.onReceivedError(view, errorCode, description, failingUrl);
 					}
+				} else {
+					Log.e(className, "===>>> onReceivedError Reloading WebView !!!");
+					// super.onReceivedError(view, errorCode, description, failingUrl);
+					view.reload();
 				}
 			}
 
@@ -959,7 +975,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// otherwise load resources from the network.
 		// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
 		// available, even if they have expired. Otherwise load resources from the network.
-		// Aim is to allow playback start even if there is no internet connection
+		// Currently it is impossible to achieve acceptable playback when there is no
+		// internet connection. Aim to minimize data traffic by using aggressive caching strategy
 		webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
 		webSettings.setDomStorageEnabled(true);
 		// deprecated
