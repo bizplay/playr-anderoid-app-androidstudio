@@ -113,29 +113,32 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// Set up looks of the view
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+			getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		}
 //		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 //			getWindow().addFlags(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
 //		}
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		View decorView = getWindow().getDecorView();
-		decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
-			@Override
-			public void onSystemUiVisibilityChange(int visibility) {
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+			decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
 				// Note that system bars will only be "visible" if none of the
 				// LOW_PROFILE, HIDE_NAVIGATION, or FULLSCREEN flags are set.
 				if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
 					// bars are visible => user touched the screen, make the bars disappear again in 2 seconds
 					Handler handler = new Handler();
-					handler.postDelayed(new Runnable() {
-						public void run() {
-							hideBars();
-						}
-					}, 2000);
+					handler.postDelayed(() -> hideBars(), 2000);
 				} else {
 					// The system bars are NOT visible => do nothing
 				}
-			}
-		});
+			});
+		} else {
+			// TODO implement hiding status and navigation bars using WindowInsets
+			// see https://developer.android.com/reference/android/view/View.OnSystemUiVisibilityChangeListener
+			//     https://developer.android.com/reference/android/view/WindowInsets#isVisible(int)
+			//     https://developer.android.com/reference/android/view/View.OnApplyWindowInsetsListener
+		}
 		decorView.setKeepScreenOn(true);
 
 		// request overlay permission needed for 'auto start' ability
@@ -145,6 +148,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		openBrowserView((savedInstanceState == null),
 						(savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
 						retrieveOrGeneratePlayerId());
+		Log.i(className, "onCreate end");
 	}
 
 	@Override
@@ -240,14 +244,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
-		Log.e(className, "********************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + analyseMemoryStatus() + "\n****************************************");
+		MemoryStatus memoryStatus = analyseMemoryStatus();
+		Log.e(className, ".\n***************************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + memoryStatus + "\n***************************************************************************************\n.");
 
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
 			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
 			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
 			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-                // Release as much memory as the process can.
+				// Release as much memory as the process can.
 			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
 				// while testing it turned out that moments after available
 				// memory was at 112% of threshold (in VM) the highest level
@@ -256,26 +261,68 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// Release any UI objects that currently hold memory.
 				// The user interface has moved to the background.
 				// ==>> restart the application
-				this.restartActivity();
+				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
 				// ==>> dump browser view and recreate it
-				this.recreateBrowserView();
+				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
 				// ==>> reload browser view
-				this.reloadBrowserView();
+				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			default:
-                // Release any non-critical data structures.
+				// Release any non-critical data structures.
 				//
-                // The app received an unrecognized memory level value
-                // from the system. Treat this as a generic low-memory message.
+				// The app received an unrecognized memory level value
+				// from the system. Treat this as a generic low-memory message.
 				// ==>> reload browser view
 				Log.e(className, "onTrimMemory - Non standard level detected: " + level);
 				break;
 		}
 	}
+// original onTrimMemory(int level) leads to crashes
+// it turns out that on some players this method is called frequently (less than 0.1 seconds apart)
+// with very severe levels causing
+//	public void onTrimMemory(int level) {
+//		Log.i(className, "override onTrimMemory");
+//		super.onTrimMemory(level);
+//		Log.e(className, ".\n***************************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + analyseMemoryStatus() + "\n***************************************************************************************\n.");
+//
+//		// Determine which lifecycle or system event was raised.
+//		switch (level) {
+//			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
+//			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
+//			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
+//                // Release as much memory as the process can.
+//			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
+//				// while testing it turned out that moments after available
+//				// memory was at 112% of threshold (in VM) the highest level
+//				// reported was TRIM_MEMORY_RUNNING_CRITICAL
+//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
+//				// Release any UI objects that currently hold memory.
+//				// The user interface has moved to the background.
+//				// ==>> restart the application
+//				this.restartActivity();
+//				break;
+//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
+//				// ==>> dump browser view and recreate it
+//				this.recreateBrowserView();
+//				break;
+//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
+//				// ==>> reload browser view
+//				this.reloadBrowserView();
+//				break;
+//			default:
+//                // Release any non-critical data structures.
+//				//
+//                // The app received an unrecognized memory level value
+//                // from the system. Treat this as a generic low-memory message.
+//				// ==>> reload browser view
+//				Log.e(className, "onTrimMemory - Non standard level detected: " + level);
+//				break;
+//		}
+//	}
 	// end of implementation ComponentCallbacks2
 
 	// implement the IServiceCallbacks interface
@@ -519,6 +566,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
+		Log.i(className, "openBrowserView");
 		setContentView(R.layout.activity_main);
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
@@ -538,6 +586,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
 		} else {
 			// fall back to WebView
+			if (webView != null) {
+				Log.e(className, "openBrowserView webView is not null");
+			}
 			webView = openWebView(initialiseWebContent, playerId);
 		}
 	}
@@ -799,6 +850,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private MemoryStatus analyseMemoryStatus() {
 		MemoryStatus result = MemoryStatus.OK;
 
+		Log.i(className, "analyseMemoryStatus");
 		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
@@ -813,7 +865,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
 				"***************************************************************************************\n" +
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
-				"***************************************************************************************");
+				"***************************************************************************************\n.");
 		return result;
 
 
@@ -941,119 +993,126 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	/* Configure the Webview for usage as the application's window. */
 	private void setupWebView(WebView webView) {
 		Log.i(className, "setupWebView");
-		WebSettings webSettings = webView.getSettings();
-		webSettings.setJavaScriptEnabled(true);
-		// available for android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.JELLY_BEAN
-		webSettings.setMediaPlaybackRequiresUserGesture(false);
-		webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
-		webSettings.setLoadWithOverviewMode(true);
-		webSettings.setUseWideViewPort(true);
-		webSettings.setAllowContentAccess(true);
-		webSettings.setAllowFileAccess(true);
-		webSettings.setAllowFileAccessFromFileURLs(true);
-		webSettings.setAllowUniversalAccessFromFileURLs(true);
-		webSettings.setLoadsImagesAutomatically(true);
-		webSettings.setBlockNetworkImage(false);
-		webSettings.setTextZoom(100);
-		webSettings.setMediaPlaybackRequiresUserGesture(false);
-		// TODO check if these font related settings are needed to ensure correct font rendering
-		//webSettings.setDefaultFixedFontSize();
-		//webSettings.setDefaultFontSize();
-		//webSettings.setMinimumFontSize();
-		//webSettings.setMinimumLogicalFontSize();
-		// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
-		webSettings.setBuiltInZoomControls(false);
-		webSettings.setSupportZoom(false);
-		// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
-		// webSettings.setPluginState(PluginState.ON);
-		// Caching of web content:
-		// When navigating back, content is not revalidated, instead the content is just retrieved
-		// from the cache. Disable the cache to fix this.
-		// We do not have back navigation nor use content validation
-		// * Default cache usage mode; LOAD_DEFAULT. If the navigation type doesn't impose any
-		// specific behavior, use cached resources when they are available and not expired,
-		// otherwise load resources from the network.
-		// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
-		// available, even if they have expired. Otherwise load resources from the network.
-		// Currently it is impossible to achieve acceptable playback when there is no
-		// internet connection. Aim to minimize data traffic by using aggressive caching strategy
-		webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
-		webSettings.setDomStorageEnabled(true);
-		// deprecated
-		// webSettings.setAppCachePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/cache");
-		webSettings.setDatabaseEnabled(true);
-		// deprecated
-		// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
-		webView.resumeTimers();
-		webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-		setTouchHandling(webView);
+		if (webView != null) {
+			WebSettings webSettings = webView.getSettings();
+			webSettings.setJavaScriptEnabled(true);
+			// available for android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.JELLY_BEAN
+			webSettings.setMediaPlaybackRequiresUserGesture(false);
+			webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+			webSettings.setLoadWithOverviewMode(true);
+			webSettings.setUseWideViewPort(true);
+			webSettings.setAllowContentAccess(true);
+			webSettings.setAllowFileAccess(true);
+			webSettings.setAllowFileAccessFromFileURLs(true);
+			webSettings.setAllowUniversalAccessFromFileURLs(true);
+			webSettings.setLoadsImagesAutomatically(true);
+			webSettings.setBlockNetworkImage(false);
+			webSettings.setTextZoom(100);
+			webSettings.setMediaPlaybackRequiresUserGesture(false);
+			// TODO check if these font related settings are needed to ensure correct font rendering
+			//webSettings.setDefaultFixedFontSize();
+			//webSettings.setDefaultFontSize();
+			//webSettings.setMinimumFontSize();
+			//webSettings.setMinimumLogicalFontSize();
+			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
+			webSettings.setBuiltInZoomControls(false);
+			webSettings.setSupportZoom(false);
+			// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
+			// webSettings.setPluginState(PluginState.ON);
+			// Caching of web content:
+			// When navigating back, content is not revalidated, instead the content is just retrieved
+			// from the cache. Disable the cache to fix this.
+			// We do not have back navigation nor use content validation
+			// * Default cache usage mode; LOAD_DEFAULT. If the navigation type doesn't impose any
+			// specific behavior, use cached resources when they are available and not expired,
+			// otherwise load resources from the network.
+			// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
+			// available, even if they have expired. Otherwise load resources from the network.
+			// Currently it is impossible to achieve acceptable playback when there is no
+			// internet connection. Aim to minimize data traffic by using aggressive caching strategy
+			webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+			webSettings.setDomStorageEnabled(true);
+			// deprecated
+			// webSettings.setAppCachePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/cache");
+			webSettings.setDatabaseEnabled(true);
+			// deprecated
+			// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
+			webView.resumeTimers();
+			webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+			setTouchHandling(webView);
+		} else {
+			Log.e(className, "setupWebView, webView is null, cannot perform setup!");
+		}
 	}
 
 	private void setTouchHandling(WebView webView) {
-		// set long click handling to prevent text selection
-		webView.setOnLongClickListener(new View.OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				return true;
-			}
-		});
-		webView.setLongClickable(false);
-		// set touch handling to enable touch events in the webview to allow dynamic content control
-		webView.setOnTouchListener(new View.OnTouchListener() {
-			public final static int FINGER_RELEASED = 0;
-			public final static int FINGER_TOUCHED = 1;
-			public final static int FINGER_DRAGGING = 2;
-			public final static int FINGER_UNDEFINED = 3;
-
-			private int fingerState = FINGER_RELEASED;
-
-			@Override
-			public boolean onTouch(View view, MotionEvent motionEvent) {
-				Log.i(className, "override onTouch (webView onTouchListener)");
-				switch (motionEvent.getAction()) {
-					case MotionEvent.ACTION_DOWN:
-						if (fingerState == FINGER_RELEASED) {
-							fingerState = FINGER_TOUCHED;
-							Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
-						} else {
-							fingerState = FINGER_UNDEFINED;
-							Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
-						}
-						break;
-					case MotionEvent.ACTION_UP:
-						if(fingerState != FINGER_DRAGGING) {
-							fingerState = FINGER_RELEASED;
-
-							Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
-							// handle click/touch here if the webview does not handle it correctly
-							//webView.performClick();
-							return true;
-						}
-						else if (fingerState == FINGER_DRAGGING) {
-							fingerState = FINGER_RELEASED;
-							Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
-						} else {
-							fingerState = FINGER_UNDEFINED;
-							Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
-						}
-						break;
-					case MotionEvent.ACTION_MOVE:
-						if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
-							fingerState = FINGER_DRAGGING;
-							Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
-						} else {
-							fingerState = FINGER_UNDEFINED;
-							Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
-						}
-						break;
-					default:
-						fingerState = FINGER_UNDEFINED;
-						Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
+		if (webView != null) {
+			// set long click handling to prevent text selection
+			webView.setOnLongClickListener(new View.OnLongClickListener() {
+				@Override
+				public boolean onLongClick(View v) {
+					return true;
 				}
-				Log.i(className, "onTouch: return false");
-				return false;
-			}
-		});
+			});
+			webView.setLongClickable(false);
+			// set touch handling to enable touch events in the webview to allow dynamic content control
+			webView.setOnTouchListener(new View.OnTouchListener() {
+				public final static int FINGER_RELEASED = 0;
+				public final static int FINGER_TOUCHED = 1;
+				public final static int FINGER_DRAGGING = 2;
+				public final static int FINGER_UNDEFINED = 3;
+
+				private int fingerState = FINGER_RELEASED;
+
+				@Override
+				public boolean onTouch(View view, MotionEvent motionEvent) {
+					Log.i(className, "override onTouch (webView onTouchListener)");
+					switch (motionEvent.getAction()) {
+						case MotionEvent.ACTION_DOWN:
+							if (fingerState == FINGER_RELEASED) {
+								fingerState = FINGER_TOUCHED;
+								Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
+							} else {
+								fingerState = FINGER_UNDEFINED;
+								Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
+							}
+							break;
+						case MotionEvent.ACTION_UP:
+							if (fingerState != FINGER_DRAGGING) {
+								fingerState = FINGER_RELEASED;
+
+								Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
+								// handle click/touch here if the webview does not handle it correctly
+								//webView.performClick();
+								return true;
+							} else if (fingerState == FINGER_DRAGGING) {
+								fingerState = FINGER_RELEASED;
+								Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
+							} else {
+								fingerState = FINGER_UNDEFINED;
+								Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
+							}
+							break;
+						case MotionEvent.ACTION_MOVE:
+							if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
+								fingerState = FINGER_DRAGGING;
+								Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
+							} else {
+								fingerState = FINGER_UNDEFINED;
+								Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
+							}
+							break;
+						default:
+							fingerState = FINGER_UNDEFINED;
+							Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
+					}
+					Log.i(className, "onTouch: return false");
+					return false;
+				}
+			});
+		} else {
+			Log.e(className, "setTouchHandling, webView is null, cannot set up touch handling!");
+		}
 	}
 
 	private void storePlayerId(String value) {
@@ -1064,10 +1123,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void recreateBrowserView() {
-		Log.i(className, "recreateBrowserView");
+		Log.i(className, "recreateBrowserView start");
 		this.unBindServiceConnection();
 		this.destroyBrowserView();
 		this.openBrowserView(true, false, this.retrieveOrGeneratePlayerId());
+		Log.i(className, "recreateBrowserView end");
 	}
 
 	private void reloadBrowserView() {

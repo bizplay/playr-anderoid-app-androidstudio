@@ -3,8 +3,8 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "2.8.6",
-        versionCode: 39,
+        versionName: "2.8.8",
+        versionCode: 40,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.

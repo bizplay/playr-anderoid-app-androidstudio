@@ -26,6 +26,7 @@
 
     function loadPlayer() {
       "use strict";
+      console.error("loadPlayer start");
       displayInformation();
       // Append Date param to ensure cache bypass
       var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
@@ -37,34 +38,42 @@
           if (request.readyState === 4) {
             if (request.status === 200) {
               showStatus("Starting playback", "loading content...", "info");
+              console.error("onreadystatechange gotoPlayer()");
               gotoPlayer();
             } else {
               showStatus("Error", "code=" + request.status.toString(), "error");
+              console.error("onreadystatechange retryLoading()");
               retryLoading();
             }
           } else {
             showStatus("Loading", "status=" + request.readyState.toString(), "info");
+            console.error("onreadystatechange request.readyState !== 4");
           }
         }
 
         // make sure there is enough time to read the parameters
         setTimeout(function () {
           try {
+            console.error("loadPlayer request.open()");
             request.open("GET", url, true); // true to make the call async
             request.send();
           } catch (exception) {
+            console.error("loadPlayer request.open exception => retryLoading(): " + exception.message);
             showStatus(exception.name, exception.message, "error");
             retryLoading();
           }
         },5000);
       } catch (exception) {
+        console.error("loadPlayer exception => retryLoading(): " + exception.message);
         showStatus(exception.name, exception.message, "error");
         retryLoading();
       }
+      console.error("loadPlayer end");
     };
 
     function gotoPlayer() {
       "use strict";
+      console.error("gotoPlayer start");
       document.getElementById("status").style.display = "none";
       document.getElementById("countdown").style.display = "none";
       document.getElementById("parameters").style.display = "none";
@@ -72,10 +81,12 @@
       // Append Date param to ensure cache bypass
       var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version + "&ts=" + escape(new Date().getTime());
       var timeoutHandle = setTimeout(function(){window.location = windowLocation;},2000);
+      console.error("gotoPlayer end");
     };
 
     function retryLoading() {
       "use strict";
+      console.error("retryLoading start");
       var countdown = 15;
       document.getElementById("status").style.display = "block";
       setTimeout(function () { document.getElementById("countdown").style.display = "block"; }, 2000);
@@ -90,6 +101,7 @@
           window.location.reload();
         }
       }, 1000);
+      console.error("retryLoading end");
     };
 
     function displayInformation() {
@@ -178,7 +190,7 @@
     };
   </script>
 </head>
-<body onload="loadPlayer();">
+<body onload="console.error('body onload'); loadPlayer();">
   <div id="ajax_loader"></div>
   <div id="status"></div>
   <div id="parameters"></div>
