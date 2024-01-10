@@ -283,7 +283,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 // original onTrimMemory(int level) leads to crashes
 // it turns out that on some players this method is called frequently (less than 0.1 seconds apart)
-// with very severe levels causing
+// with very severe levels causing the logic below to restart this activity unnecessarily
+// leading to the more conservative functionality above
 //	public void onTrimMemory(int level) {
 //		Log.i(className, "override onTrimMemory");
 //		super.onTrimMemory(level);
@@ -1029,8 +1030,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// * Use cache when needed; LOAD_CACHE_ELSE_NETWORK. Use cached resources when they are
 			// available, even if they have expired. Otherwise load resources from the network.
 			// Currently it is impossible to achieve acceptable playback when there is no
-			// internet connection. Aim to minimize data traffic by using aggressive caching strategy
-			webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+			// internet connection.
+			// The aim to minimize data traffic by using aggressive caching strategy will lead to
+			// the fact that web pages shown in the browser-app will not refresh when specified
+			// because the LOAD_CACHE_ELSE_NETWORK setting will prevent the necessary call to the
+			// server
+			webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 			webSettings.setDomStorageEnabled(true);
 			// deprecated
 			// webSettings.setAppCachePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/cache");
