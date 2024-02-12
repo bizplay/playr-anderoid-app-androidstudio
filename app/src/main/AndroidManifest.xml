@@ -51,7 +51,7 @@
 	<!-- Manage overlay permission, needed for restart on API Q and newer -->
 <!--	<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION"/>-->
 <!--	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>-->
-	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+<!--	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>-->
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application

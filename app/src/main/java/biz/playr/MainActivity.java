@@ -224,7 +224,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				}
 			} else {
 				try {
-					mgr.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+					// as of Android 14 (API 34) calling setExact is no longer permitted
+					mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
 					Log.i(className, "restartDelayed: called setExact");
 				} catch (SecurityException ex) {
 					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
