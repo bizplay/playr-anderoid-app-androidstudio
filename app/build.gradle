@@ -3,8 +3,8 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "2.9.0",
-        versionCode: 41,
+        versionName: "2.9.2",
+        versionCode: 42,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -28,13 +28,15 @@ def twaManifest = [
 ]
 
 allprojects {
-    tasks.withType(JavaCompile) {
-        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    tasks.withType(JavaCompile).tap {
+        configureEach {
+            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+        }
     }
 }
 
 android {
-    compileSdk 33
+    compileSdk 34
     namespace 'biz.playr'
 
     defaultConfig {
@@ -42,7 +44,7 @@ android {
         versionCode appManifest.versionCode
         versionName appManifest.versionName
         minSdkVersion 19
-        targetSdkVersion 33
+        targetSdkVersion 34
 
         // The name for the application on the Android Launcher
         resValue "string", "appName", appManifest.name
@@ -138,7 +140,7 @@ dependencies {
     implementation 'androidx.leanback:leanback:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.cardview:cardview:1.0.0'
-    implementation 'androidx.webkit:webkit:1.7.0'
+    implementation 'androidx.webkit:webkit:1.10.0'
 //    implementation 'androidx.browser:browser:1.2.0'
 
     // From TwaDemoJava demo project (also including maven
