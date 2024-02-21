@@ -1,37 +1,40 @@
 package biz.playr;
 
-import java.util.UUID;
 
-//import android.Manifest;
+import java.util.UUID;
+import static android.view.WindowInsets.Type.navigationBars;
+import static android.view.WindowInsets.Type.statusBars;
+import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.ActionBar;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
-import android.net.Uri;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.IBinder;
-import android.provider.Settings;
-import android.security.NetworkSecurityPolicy;
-import android.util.Log;
-import android.view.MotionEvent;
-import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
-import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.app.ActionBar;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.view.View;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.provider.Settings;
+import android.security.NetworkSecurityPolicy;
+import android.util.Log;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
@@ -41,7 +44,8 @@ import android.webkit.WebResourceError;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
-
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -51,11 +55,9 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.browser.customtabs.TrustedWebUtils;
+import androidx.core.content.pm.PackageInfoCompat;
+import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
-//import androidx.core.app.ActivityCompat;
-//import androidx.webkit.WebResourceRequestCompat;
-//import androidx.webkit.WebSettingsCompat;
-//import androidx.webkit.WebViewClientCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
@@ -78,6 +80,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
+	// Because WebSetting allowFileAccessFromFileURLs is Deprecated
+	// https://stackoverflow.com/a/63707709
+	// and https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
+	private final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
+			.addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+			.addPathHandler("/res/", new WebViewAssetLoader.ResourcesPathHandler(this))
+			.build();
 
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
@@ -122,17 +131,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		View decorView = getWindow().getDecorView();
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-			decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
-				// Note that system bars will only be "visible" if none of the
-				// LOW_PROFILE, HIDE_NAVIGATION, or FULLSCREEN flags are set.
-				if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-					// bars are visible => user touched the screen, make the bars disappear again in 2 seconds
-					Handler handler = new Handler();
-					handler.postDelayed(() -> hideBars(), 2000);
-				} else {
-					// The system bars are NOT visible => do nothing
-				}
-			});
+			decorView.setOnSystemUiVisibilityChangeListener(this::onSystemUiVisibilityChange);
 		} else {
 			// TODO implement hiding status and navigation bars using WindowInsets
 			// see https://developer.android.com/reference/android/view/View.OnSystemUiVisibilityChangeListener
@@ -148,6 +147,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		openBrowserView((savedInstanceState == null),
 						(savedInstanceState != null && savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY)),
 						retrieveOrGeneratePlayerId());
+		// API 33+ way to handle back button
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, backPressedHandler());
+		}
+
 		Log.i(className, "onCreate end");
 	}
 
@@ -394,7 +398,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// bind to CheckRestartService
 			Intent intent = new Intent(this, CheckRestartService.class);
 //			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE);
+			bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
 			// checkRestartService = TODO how do we point this attribute to the service instance
 			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
 			bound = true;
@@ -404,7 +408,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 			Intent intent = new Intent(this, CheckRestartService.class);
 //			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE);
+			bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
 			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
 			bound = true;
 			if (this.checkRestartService == null) {
@@ -501,22 +505,31 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	@SuppressLint("InlinedApi")
 	protected void hideBars() {
-		if (getWindow() != null) {
-			View decorView = getWindow().getDecorView();
-			// Hide both the navigation bar and the status bar.
-			// SYSTEM_UI_FLAG_FULLSCREEN is available from Android 4.1 (API 16) and higher, but as
-			// a general rule, you should design your app to hide the status bar whenever you
-			// hide the navigation bar.
-			// SYSTEM_UI_FLAG_HIDE_NAVIGATION is available from API level 14
-			// SYSTEM_UI_FLAG_IMMERSIVE_STICKY is available from API 18
-			int uiOptions =   View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-							| View.SYSTEM_UI_FLAG_FULLSCREEN
-							| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-			// Enables regular immersive mode.
-			// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
-			// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-//					| View.SYSTEM_UI_FLAG_IMMERSIVE;
-			decorView.setSystemUiVisibility(uiOptions);
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+			if (getWindow() != null) {
+				View decorView = getWindow().getDecorView();
+				// Hide both the navigation bar and the status bar.
+				// SYSTEM_UI_FLAG_FULLSCREEN is available from Android 4.1 (API 16) and higher, but as
+				// a general rule, you should design your app to hide the status bar whenever you
+				// hide the navigation bar.
+				// SYSTEM_UI_FLAG_HIDE_NAVIGATION is available from API level 14
+				// SYSTEM_UI_FLAG_IMMERSIVE_STICKY is available from API 18
+				int uiOptions =   View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+								| View.SYSTEM_UI_FLAG_FULLSCREEN
+								| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+				// Enables regular immersive mode.
+				// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
+				// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+				//				| View.SYSTEM_UI_FLAG_IMMERSIVE;
+				decorView.setSystemUiVisibility(uiOptions);
+			}
+		} else {
+			if (getWindow() != null) {
+				WindowInsetsController windowInsetsController = getWindow().getInsetsController();
+				windowInsetsController.hide(navigationBars());
+				windowInsetsController.hide(statusBars());
+				windowInsetsController.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+			}
 		}
 		// Remember that you should never show the action bar if the
 		// status bar is hidden, so hide that too if necessary.
@@ -529,20 +542,31 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Override
 	/* Navigate the WebView's history when the user presses the Back key. */
 	public void onBackPressed() {
-		if (webView != null) {
-			if (webView.canGoBack()) {
-				webView.goBack();
-			} else {
-				super.onBackPressed();
-			}
-		} else {
-			super.onBackPressed();
-		}
+		handleBackPressed();
+		super.onBackPressed();
 	}
-
 	/*
 	 * PRIVATE methods
 	 */
+	private OnBackInvokedCallback backPressedHandler() {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+			return new OnBackInvokedCallback() {
+				@Override
+				public void onBackInvoked() {
+					handleBackPressed();
+				}
+			};
+		} else {
+			return null;
+		}
+	}
+	private void handleBackPressed() {
+		if (webView != null) {
+			if (webView.canGoBack()) {
+				webView.goBack();
+			}
+		}
+	}
 	private void reportSystemInformation() {
 		Log.e(className, "***************************************");
 		Log.e(className, "***          API level: " + Build.VERSION.SDK_INT + "          ***");
@@ -614,7 +638,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// see; https://developer.android.com/reference/android/os/Handler.html
 		//      https://developer.android.com/reference/java/lang/Runnable.html
 		//      https://developer.android.com/reference/android/os/Looper.html
-		memoryCheckHandler = new Handler();
+		memoryCheckHandler = new Handler(Looper.getMainLooper());
 		continueMemoryCheck = true;
 
 		memoryCheckRunner = () -> {
@@ -835,6 +859,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				}
 				super.onReceivedHttpError(view, request, errorResponse);
 			}
+
+			// see https://stackoverflow.com/a/63707709
+			// https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
+			@Override
+			public WebResourceResponse shouldInterceptRequest(WebView view,
+															  WebResourceRequest request) {
+				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+					return assetLoader.shouldInterceptRequest(request.getUrl());
+				} else {
+					return super.shouldInterceptRequest(view, request);
+				}
+			}
 		};
 	};
 
@@ -916,24 +952,28 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private String pageUrl(String playerId, String webviewUserAgent) {
 		String webviewVersion = "Android System WebView not installed";
 		String appVersion = "app version not found";
+		Long versionCode;
 		PackageManager pm = getPackageManager();
 		PackageInfo pi;
 		PackageInfo pi2;
 		try {
 			pi = pm.getPackageInfo("com.google.android.webview", 0);
 			if (pi != null) {
+				versionCode = PackageInfoCompat.getLongVersionCode(pi);
 				webviewVersion = "Version-name: " + pi.versionName
-						+ " -code: " + pi.versionCode;
+						+ " -code: " + versionCode;
 			}
 			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//				pi2 = WebView.getCurrentWebViewPackage();
 				pi2 = WebViewCompat.getCurrentWebViewPackage(MainActivity.this);
-				if (pi2 != null && pi != null) {
-					webviewVersion += " (Version-name: " + pi2.versionName
-							+ " -code: " + pi2.versionCode + ")";
-				} else if (pi2 != null && pi == null) {
-					webviewVersion = "Version-name: " + pi2.versionName
-							+ " -code: " + pi2.versionCode;
+				if (pi2 != null) {
+					versionCode = PackageInfoCompat.getLongVersionCode(pi2);
+					if (pi != null) {
+						webviewVersion += " (Version-name: " + pi2.versionName
+								+ " -code: " + versionCode + ")";
+					} else if (pi == null) {
+						webviewVersion = "Version-name: " + pi2.versionName
+								+ " -code: " + versionCode;
+					}
 				}
 			}
 		} catch (PackageManager.NameNotFoundException e) {
@@ -956,6 +996,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				.appendQueryParameter("app_version", appVersion).build()
 				.toString();
 	};
+
+	private void onSystemUiVisibilityChange(int visibility) {
+		// Note that system bars will only be "visible" if none of the
+		// LOW_PROFILE, HIDE_NAVIGATION, or FULLSCREEN flags are set.
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+			// bars are visible => user touched the screen, make the bars disappear again in 2 seconds
+			Handler handler = new Handler(Looper.getMainLooper());
+			handler.postDelayed(() -> hideBars(), 2000);
+		} else {
+			// The system bars are NOT visible => do nothing
+		}
+	}
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
 		private static final String className = "biz.playr.TwaCusTbsSrvC";
@@ -1005,8 +1057,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			webSettings.setUseWideViewPort(true);
 			webSettings.setAllowContentAccess(true);
 			webSettings.setAllowFileAccess(true);
-			webSettings.setAllowFileAccessFromFileURLs(true);
-			webSettings.setAllowUniversalAccessFromFileURLs(true);
+			if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+				webSettings.setAllowFileAccessFromFileURLs(true);
+				webSettings.setAllowUniversalAccessFromFileURLs(true);
+			}
 			webSettings.setLoadsImagesAutomatically(true);
 			webSettings.setBlockNetworkImage(false);
 			webSettings.setTextZoom(100);
@@ -1180,7 +1234,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			webView.onPause();
 			webView.removeAllViews();
-			webView.destroyDrawingCache();
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+				// The view drawing cache was largely made obsolete with
+				// the introduction of hardware-accelerated rendering in API 11
+				// see: https://developer.android.com/reference/android/view/View.html#destroyDrawingCache()
+				webView.destroyDrawingCache();
+			}
 
 			// NOTE: This pauses JavaScript execution for ALL WebViews,
 			// do not use if you have other WebViews still alive.
