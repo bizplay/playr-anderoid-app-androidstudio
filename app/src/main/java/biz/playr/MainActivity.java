@@ -593,7 +593,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
 		Log.i(className, "openBrowserView");
-		setContentView(R.layout.activity_main);
+//		setContentView(R.layout.activity_main);
 		// create Trusted Web Access or fall back to a WebView
 		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
@@ -610,12 +610,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 
 			twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
+			// setContentView(?????);
 		} else {
 			// fall back to WebView
 			if (webView != null) {
 				Log.e(className, "openBrowserView webView is not null");
 			}
 			webView = openWebView(initialiseWebContent, playerId);
+			setContentView(webView);
 		}
 	}
 
@@ -664,7 +666,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private WebView openWebView(boolean initialiseWebContent, String playerId) {
-		WebView result = (WebView) findViewById(R.id.mainUiView);
+//		WebView result = (WebView) findViewById(R.id.mainUiView);
+		WebView result = new CustomWebView(this);
 		Log.i(className, "openWebView; webView is " + (result == null ? "null" : "not null"));
 		setupWebView(result);
 		result.setWebChromeClient(createWebChromeClient());
@@ -1063,16 +1066,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 			webSettings.setLoadsImagesAutomatically(true);
 			webSettings.setBlockNetworkImage(false);
-			webSettings.setTextZoom(100);
+			webSettings.setSupportMultipleWindows(false);
 			webSettings.setMediaPlaybackRequiresUserGesture(false);
+			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
+			webSettings.setBuiltInZoomControls(false);
+			webSettings.setDisplayZoomControls(false);
+			webSettings.setSupportZoom(false);
+			webSettings.setTextZoom(100);
 			// TODO check if these font related settings are needed to ensure correct font rendering
 			//webSettings.setDefaultFixedFontSize();
 			//webSettings.setDefaultFontSize();
 			//webSettings.setMinimumFontSize();
 			//webSettings.setMinimumLogicalFontSize();
-			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
-			webSettings.setBuiltInZoomControls(false);
-			webSettings.setSupportZoom(false);
 			// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
 			// webSettings.setPluginState(PluginState.ON);
 			// Caching of web content:
@@ -1099,81 +1104,86 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
 			webView.resumeTimers();
 			webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-			setTouchHandling(webView);
+//			setTouchHandling(webView);
 		} else {
 			Log.e(className, "setupWebView, webView is null, cannot perform setup!");
 		}
 	}
 
-	private void setTouchHandling(WebView webView) {
-		if (webView != null) {
-			// set long click handling to prevent text selection
-			webView.setOnLongClickListener(new View.OnLongClickListener() {
-				@Override
-				public boolean onLongClick(View v) {
-					return true;
-				}
-			});
-			webView.setLongClickable(false);
-			// set touch handling to enable touch events in the webview to allow dynamic content control
-			webView.setOnTouchListener(new View.OnTouchListener() {
-				public final static int FINGER_RELEASED = 0;
-				public final static int FINGER_TOUCHED = 1;
-				public final static int FINGER_DRAGGING = 2;
-				public final static int FINGER_UNDEFINED = 3;
-
-				private int fingerState = FINGER_RELEASED;
-
-				@Override
-				public boolean onTouch(View view, MotionEvent motionEvent) {
-					Log.i(className, "override onTouch (webView onTouchListener)");
-					switch (motionEvent.getAction()) {
-						case MotionEvent.ACTION_DOWN:
-							if (fingerState == FINGER_RELEASED) {
-								fingerState = FINGER_TOUCHED;
-								Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
-							} else {
-								fingerState = FINGER_UNDEFINED;
-								Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
-							}
-							break;
-						case MotionEvent.ACTION_UP:
-							if (fingerState != FINGER_DRAGGING) {
-								fingerState = FINGER_RELEASED;
-
-								Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
-								// handle click/touch here if the webview does not handle it correctly
-								//webView.performClick();
-								return true;
-							} else if (fingerState == FINGER_DRAGGING) {
-								fingerState = FINGER_RELEASED;
-								Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
-							} else {
-								fingerState = FINGER_UNDEFINED;
-								Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
-							}
-							break;
-						case MotionEvent.ACTION_MOVE:
-							if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
-								fingerState = FINGER_DRAGGING;
-								Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
-							} else {
-								fingerState = FINGER_UNDEFINED;
-								Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
-							}
-							break;
-						default:
-							fingerState = FINGER_UNDEFINED;
-							Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
-					}
-					Log.i(className, "onTouch: return false");
-					return false;
-				}
-			});
-		} else {
-			Log.e(className, "setTouchHandling, webView is null, cannot set up touch handling!");
-		}
-	}
+//	private void setTouchHandling(WebView webView) {
+//		if (webView != null) {
+//			// set long click handling to prevent text selection
+//			webView.setOnLongClickListener(new View.OnLongClickListener() {
+//				@Override
+//				public boolean onLongClick(View v) {
+//					return true;
+//				}
+//			});
+//			webView.setLongClickable(false);
+//			// set touch handling to enable touch events in the webView to allow dynamic content control
+//			webView.setOnTouchListener(new View.OnTouchListener() {
+//				public final static int FINGER_RELEASED = 0;
+//				public final static int FINGER_TOUCHED = 1;
+//				public final static int FINGER_DRAGGING = 2;
+//				public final static int FINGER_UNDEFINED = 3;
+//
+//				private int fingerState = FINGER_RELEASED;
+//
+//				@Override
+//				public boolean onTouch(View view, MotionEvent motionEvent) {
+//					Log.i(className, "override onTouch (webView onTouchListener)");
+//					if (motionEvent.getPointerCount() > 1) {
+//						fingerState = FINGER_UNDEFINED;
+//						Log.i(className, "onTouch: multiple fingers detected, reset fingerState");
+//					} else {
+//						switch (motionEvent.getAction()) {
+//							case MotionEvent.ACTION_DOWN:
+//								if (fingerState == FINGER_RELEASED) {
+//									fingerState = FINGER_TOUCHED;
+//									Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
+//								} else {
+//									fingerState = FINGER_UNDEFINED;
+//									Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
+//								}
+//								break;
+//							case MotionEvent.ACTION_UP:
+//								if (fingerState != FINGER_DRAGGING) {
+//									fingerState = FINGER_RELEASED;
+//									Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
+//									// handle click/touch here if the webview does not handle it correctly
+//									boolean result = webView.performClick();
+//									Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, result performClick: " + result + ", return true");
+//									return true;
+//								} else if (fingerState == FINGER_DRAGGING) {
+//									fingerState = FINGER_RELEASED;
+//									Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
+//								} else {
+//									fingerState = FINGER_UNDEFINED;
+//									Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
+//								}
+//								break;
+//							case MotionEvent.ACTION_MOVE:
+//								if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
+//									fingerState = FINGER_DRAGGING;
+//									Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
+//								} else {
+//									fingerState = FINGER_UNDEFINED;
+//									Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
+//								}
+//								break;
+//							default:
+//								fingerState = FINGER_UNDEFINED;
+//								Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
+//						}
+//					}
+//					Log.i(className, "onTouch: return false");
+//					return false;
+//				}
+//			});
+//		} else {
+//			Log.e(className, "setTouchHandling, webView is null, cannot set up touch handling!");
+//		}
+//	}
 
 	private void storePlayerId(String value) {
 		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
