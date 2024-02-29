@@ -29,7 +29,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -245,6 +244,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	 * Release memory when the UI becomes hidden or when system resources become low.
 	 * @param level the memory-related event that was raised.
 	 */
+	// original onTrimMemory(int level) functionality lead to crashes
+	// it turns out that on some players this method is called frequently (less than 0.1 seconds apart)
+	// with very severe levels causing the logic below to restart this activity unnecessarily
+	// leading to the more conservative functionality calling freeMemoryWhenNeeded(memoryStatus)
 	@Override
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
@@ -266,14 +269,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// Release any UI objects that currently hold memory.
 				// The user interface has moved to the background.
 				// ==>> restart the application
+				// this.restartActivity();
 				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
 				// ==>> dump browser view and recreate it
+				// this.recreateBrowserView();
 				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
 				// ==>> reload browser view
+				// this.reloadBrowserView();
 				freeMemoryWhenNeeded(memoryStatus);
 				break;
 			default:
@@ -286,49 +292,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				break;
 		}
 	}
-// original onTrimMemory(int level) leads to crashes
-// it turns out that on some players this method is called frequently (less than 0.1 seconds apart)
-// with very severe levels causing the logic below to restart this activity unnecessarily
-// leading to the more conservative functionality above
-//	public void onTrimMemory(int level) {
-//		Log.i(className, "override onTrimMemory");
-//		super.onTrimMemory(level);
-//		Log.e(className, ".\n***************************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + analyseMemoryStatus() + "\n***************************************************************************************\n.");
-//
-//		// Determine which lifecycle or system event was raised.
-//		switch (level) {
-//			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
-//			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
-//			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-//                // Release as much memory as the process can.
-//			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
-//				// while testing it turned out that moments after available
-//				// memory was at 112% of threshold (in VM) the highest level
-//				// reported was TRIM_MEMORY_RUNNING_CRITICAL
-//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
-//				// Release any UI objects that currently hold memory.
-//				// The user interface has moved to the background.
-//				// ==>> restart the application
-//				this.restartActivity();
-//				break;
-//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-//				// ==>> dump browser view and recreate it
-//				this.recreateBrowserView();
-//				break;
-//			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
-//				// ==>> reload browser view
-//				this.reloadBrowserView();
-//				break;
-//			default:
-//                // Release any non-critical data structures.
-//				//
-//                // The app received an unrecognized memory level value
-//                // from the system. Treat this as a generic low-memory message.
-//				// ==>> reload browser view
-//				Log.e(className, "onTrimMemory - Non standard level detected: " + level);
-//				break;
-//		}
-//	}
 	// end of implementation ComponentCallbacks2
 
 	// implement the IServiceCallbacks interface
@@ -1104,86 +1067,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// webSettings.setDatabasePath(getApplicationContext().getFilesDir().getAbsolutePath() + "/databases");
 			webView.resumeTimers();
 			webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-//			setTouchHandling(webView);
 		} else {
 			Log.e(className, "setupWebView, webView is null, cannot perform setup!");
 		}
 	}
-
-//	private void setTouchHandling(WebView webView) {
-//		if (webView != null) {
-//			// set long click handling to prevent text selection
-//			webView.setOnLongClickListener(new View.OnLongClickListener() {
-//				@Override
-//				public boolean onLongClick(View v) {
-//					return true;
-//				}
-//			});
-//			webView.setLongClickable(false);
-//			// set touch handling to enable touch events in the webView to allow dynamic content control
-//			webView.setOnTouchListener(new View.OnTouchListener() {
-//				public final static int FINGER_RELEASED = 0;
-//				public final static int FINGER_TOUCHED = 1;
-//				public final static int FINGER_DRAGGING = 2;
-//				public final static int FINGER_UNDEFINED = 3;
-//
-//				private int fingerState = FINGER_RELEASED;
-//
-//				@Override
-//				public boolean onTouch(View view, MotionEvent motionEvent) {
-//					Log.i(className, "override onTouch (webView onTouchListener)");
-//					if (motionEvent.getPointerCount() > 1) {
-//						fingerState = FINGER_UNDEFINED;
-//						Log.i(className, "onTouch: multiple fingers detected, reset fingerState");
-//					} else {
-//						switch (motionEvent.getAction()) {
-//							case MotionEvent.ACTION_DOWN:
-//								if (fingerState == FINGER_RELEASED) {
-//									fingerState = FINGER_TOUCHED;
-//									Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
-//								} else {
-//									fingerState = FINGER_UNDEFINED;
-//									Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
-//								}
-//								break;
-//							case MotionEvent.ACTION_UP:
-//								if (fingerState != FINGER_DRAGGING) {
-//									fingerState = FINGER_RELEASED;
-//									Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, return true");
-//									// handle click/touch here if the webview does not handle it correctly
-//									boolean result = webView.performClick();
-//									Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, result performClick: " + result + ", return true");
-//									return true;
-//								} else if (fingerState == FINGER_DRAGGING) {
-//									fingerState = FINGER_RELEASED;
-//									Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
-//								} else {
-//									fingerState = FINGER_UNDEFINED;
-//									Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
-//								}
-//								break;
-//							case MotionEvent.ACTION_MOVE:
-//								if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
-//									fingerState = FINGER_DRAGGING;
-//									Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
-//								} else {
-//									fingerState = FINGER_UNDEFINED;
-//									Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
-//								}
-//								break;
-//							default:
-//								fingerState = FINGER_UNDEFINED;
-//								Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
-//						}
-//					}
-//					Log.i(className, "onTouch: return false");
-//					return false;
-//				}
-//			});
-//		} else {
-//			Log.e(className, "setTouchHandling, webView is null, cannot set up touch handling!");
-//		}
-//	}
 
 	private void storePlayerId(String value) {
 		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
