@@ -1,12 +1,15 @@
 package biz.playr;
 
 import android.content.Context;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.DragEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.webkit.WebView;
+
+import androidx.annotation.RequiresApi;
 
 public class CustomWebView extends WebView {
     private static final String className = "biz.playr.CustomWebView";
@@ -20,7 +23,7 @@ public class CustomWebView extends WebView {
 
         @Override
         public boolean onTouch(View view, MotionEvent motionEvent) {
-            // Log.i(className, "override onTouch (webView onTouchListener)");
+            Log.i(className, "override onTouch (webView onTouchListener)");
             if (motionEvent.getPointerCount() > 1) {
                 fingerState = FINGER_UNDEFINED;
                 Log.i(className, "onTouch: multiple fingers detected, reset fingerState");
@@ -85,6 +88,7 @@ public class CustomWebView extends WebView {
         myContext=context;
         this.setLongClickable(false);
     }
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes)
     {
         super(context, attributeSet, defStyleAttr, defStyleRes);
@@ -94,23 +98,24 @@ public class CustomWebView extends WebView {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        Log.i(className, "override onTouchEvent, delegate to onTouch or super");
         return (onTouchListener.onTouch(this, event) || super.onTouchEvent(event));
     }
 
     @Override
     public boolean performLongClick() {
-        Log.i(className, "override performLongClick");
+        Log.i(className, "override performLongClick, return false");
         return false;
     };
 
     @Override
     public boolean performClick() {
-        Log.i(className, "override performClick");
+        Log.i(className, "override performClick, delegate to super");
         return super.performClick();
     }
     @Override
     public boolean onDragEvent(DragEvent dragEvent) {
-        Log.i(className, "override onDragEvent");
+        Log.i(className, "override onDragEvent, return false");
         return false;
     }
 }
