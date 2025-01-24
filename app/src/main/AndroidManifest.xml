@@ -144,7 +144,7 @@
 			android:label="BootUpReceiver"
 			android:enabled="true"
 			android:exported="true"
-			android:permission="android.permission.RECEIVE_BOOT_COMPLETED" >
+			android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
 			<intent-filter>
 				<category android:name="android.intent.category.DEFAULT"/>
 				<action android:name="android.intent.action.BOOT_COMPLETED"/>

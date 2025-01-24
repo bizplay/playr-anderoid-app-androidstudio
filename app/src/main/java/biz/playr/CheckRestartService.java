@@ -115,7 +115,8 @@ public class CheckRestartService extends Service {
 					Log.i(className, ".run: MainActivity has to be restarted");
 					if (serviceCallbacks != null) {
 						Log.i(className, ".run: restarting MainActivity");
-						serviceCallbacks.restartActivityWithDelay();
+						// use force=true to make sure the MainActivity is restarted on all devices
+						serviceCallbacks.restartActivityWithDelay(true);
 					} else {
 						Log.e(className, ".run: restarting MainActivity impossible; serviceCallbacks is null");
 					}
@@ -125,7 +126,7 @@ public class CheckRestartService extends Service {
 			}
 		};
 		timer = new Timer();
-		timer.scheduleAtFixedRate(task, intervalBetweenRestartChecks, intervalBetweenRestartChecks);
+		timer.schedule(task, intervalBetweenRestartChecks, intervalBetweenRestartChecks);
 		Log.i(className, ".onCreate: timer was started with delay: " + intervalBetweenRestartChecks/1000 + " (s) and interval: " + intervalBetweenRestartChecks/1000 + " (s)");
 
 		// To end the application
