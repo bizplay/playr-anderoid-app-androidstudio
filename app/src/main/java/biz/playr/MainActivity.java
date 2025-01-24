@@ -1,9 +1,12 @@
 package biz.playr;
 
-
+import java.util.Date;
 import java.util.UUID;
+
 import static android.view.WindowInsets.Type.navigationBars;
 import static android.view.WindowInsets.Type.statusBars;
+import static androidx.preference.PreferenceManager.getDefaultSharedPreferences;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -96,6 +99,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		currentSavedInstanceState = savedInstanceState;
 		super.onCreate(savedInstanceState);
 
+		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setup restarting of app on crash");
@@ -193,50 +197,60 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	public void handleUncaughtException(Thread paramThread,
 		Throwable paramThrowable) {
-		Log.e(className, "handleUncaughtException; paramThread: " + paramThread
-				+ ", paramThrowable: " + paramThrowable);
-		// restartActivity();
+		Log.e(className, ".handleUncaughtException; paramThread: " + paramThread
+				+ ", paramThrowable: " + paramThrowable + " => calling recreate()");
 		recreate();
 	}
 
-	public void restartDelayed() {
-		Log.i(className, "restartDelayed");
+	// 'trick' to have a default value of false for force parameter
+	public void restartDelayed() { restartDelayed(false); }
+	// force=true can be used to make sure the restart is performed on all devices
+	// force=false makes restart device dependent; not performed on devices where
+	// it may lead to restart-loops
+	public void restartDelayed(boolean force) {
+		Log.i(className, ".restartDelayed, force: " + force);
 
-		// the context of the activityIntent might need to be the running PlayrService
-		// keep the Intent in sync with the Manifest and DefaultExceptionHandler
-//		PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
-		Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
-		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-				| Intent.FLAG_ACTIVITY_CLEAR_TASK
-				| Intent.FLAG_ACTIVITY_NEW_TASK);
-		activityIntent.setAction(Intent.ACTION_MAIN);
-		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-		// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
-		PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
-		// delay start so this activity can be ended before the new one starts
-		// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
-		AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-		if (mgr != null) {
-			Log.i(className, "restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				try {
-					mgr.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-					Log.i(className, "restartDelayed: called setExactAndAllowWhileIdle");
-				} catch (SecurityException ex) {
-					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
-				}
-			} else {
-				try {
-					// as of Android 14 (API 34) calling setExact is no longer permitted
-					mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-					Log.i(className, "restartDelayed: called setExact");
-				} catch (SecurityException ex) {
-					Log.e(className, "restartDelayed: setExactAndAllowWhileIdle caused security exception: " + ex);
-					throw ex;
+		if (getResources().getBoolean(R.bool.restart) || force) {
+			// the context of the activityIntent might need to be the running PlayrService
+			// keep the Intent in sync with the Manifest and DefaultExceptionHandler
+//			PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
+			Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
+			activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
+					| Intent.FLAG_ACTIVITY_CLEAR_TASK
+					| Intent.FLAG_ACTIVITY_NEW_TASK);
+			activityIntent.setAction(Intent.ACTION_MAIN);
+			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+			// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
+			PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+			// delay start so this activity can be ended before the new one starts
+			// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
+			AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+			if (mgr != null) {
+				Log.i(className, ".restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					// possibly better alternative, see also using Handler for this
+					try {
+						mgr.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+						Log.i(className, ".restartDelayed: called setAndAllowWhileIdle");
+					} catch (SecurityException ex) {
+						Log.e(className, ".restartDelayed: setAndAllowWhileIdle caused security exception: " + ex);
+					}
+				} else {
+					try {
+						// as of Android 14 (API 34) calling setExact is no longer permitted
+						mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
+						Log.i(className, ".restartDelayed: called set");
+					} catch (SecurityException ex) {
+						Log.e(className, ".restartDelayed: set caused security exception: " + ex);
+						throw ex;
+					}
 				}
 			}
+		} else {
+			// Pro Display usage; no restart of the MainActivity
+			Log.i(className, ".restartDelayed MainActivity NOT restarted");
 		}
-		Log.i(className, "restartDelayed: end");
+		Log.i(className, ".restartDelayed: end");
 	}
 
 	// implement the ComponentCallbacks2 interface
@@ -296,7 +310,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	// implement the IServiceCallbacks interface
 	public void restartActivityWithDelay() {
-		this.restartActivity();
+		restartActivityWithDelay(false);
+	}
+	public void restartActivityWithDelay(boolean force) {
+		this.restartActivity(force);
 	}
 
 	public String getPlayerId() {
@@ -304,9 +321,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 	// end of implementation IServiceCallbacks
 
-	public void restartActivity() {
+	// 'trick' to have a default value of false for force parameter
+	public void restartActivity() { restartActivity(false); }
+	public void restartActivity(boolean force) {
 		Log.i(className, "restartActivity: setting up delayed restart");
-		restartDelayed();
+		restartDelayed(force);
 		Log.i(className, "restartActivity: killing this process");
 		setResult(RESULT_OK);
 		Log.i(className, "restartActivity: calling finish()");
@@ -449,8 +468,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// ! restart is turned off for now since the restarts can trigger a recurring restart
 		// ! the option to auto reboot a player when it is detected to not play should be
 		// ! sufficient to keep players active
-		 Log.i(className,"onDestroy: Delayed restart of the application!!!");
-		 restartDelayed();
+		Log.i(className,"onDestroy: possibly delayed restart of the application!");
+		restartDelayed();
 
 		Log.i(className, "onDestroy: stopMemoryChecking");
 		this.stopMemoryChecking();
@@ -463,6 +482,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "onDestroy: destroyBrowserView");
 		this.destroyBrowserView();
 		super.onDestroy();
+		clearActivityCreatedAt();
 		Log.i(className, "onDestroy: end");
 	}
 
@@ -580,6 +600,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				Log.e(className, "openBrowserView webView is not null");
 			}
 			webView = openWebView(initialiseWebContent, playerId);
+			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				// prevent unintended 'focus' highlighting of the browser view
+				webView.setDefaultFocusHighlightEnabled(false);
+			}
 			setContentView(webView);
 		}
 	}
@@ -642,7 +666,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			cookieManager.setAcceptCookie(true);
 			cookieManager.setAcceptThirdPartyCookies(result, true);
 			if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-				cookieManager.setAcceptFileSchemeCookies(true);
+				CookieManager.setAcceptFileSchemeCookies(true);
 			}
 		}
 		if (initialiseWebContent) {
@@ -707,7 +731,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private String retrieveOrGeneratePlayerId() {
 		String result = getStoredPlayerId();
-		if (result == null || result.length() == 0) {
+		if (result == null || result.isEmpty()) {
 			result = UUID.randomUUID().toString();
 			storePlayerId(result);
 			Log.i(className, "generated and stored playerId: " + result);
@@ -1004,11 +1028,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		return memoryInfo;
 	}
 
-	private String getStoredPlayerId() {
-		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
-		return sharedPreferences.getString(getString(R.string.player_id_store), "");
-	}
-
 	@SuppressLint("SetJavaScriptEnabled")
 	/* Configure the Webview for usage as the application's window. */
 	private void setupWebView(WebView webView) {
@@ -1072,11 +1091,56 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
+	private String getStoredPlayerId() {
+		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
+		return sharedPreferences.getString(getString(R.string.player_id_store), "");
+	}
+
 	private void storePlayerId(String value) {
 		SharedPreferences sharedPreferences = getPreferences(Context.MODE_PRIVATE);
 		SharedPreferences.Editor editor = sharedPreferences.edit();
 		editor.putString(getString(R.string.player_id_store), value);
 		editor.commit();
+	}
+
+	private Date getActivityCreatedAt() {
+		SharedPreferences defaultSharedPreferences = getDefaultSharedPreferences(getApplicationContext());
+		return new Date(defaultSharedPreferences.getLong(getString(R.string.activity_created_at_key), 0));
+	}
+
+	private int getActivityState() {
+		SharedPreferences defaultSharedPreferences = getDefaultSharedPreferences(getApplicationContext());
+		return defaultSharedPreferences.getInt(getString(R.string.activity_state_key), -1);
+	}
+
+	private void storeActivityCreatedAt() {
+		// Using Instant would be easier but Instant.now() is only available from API level 26
+		Date now = new Date();
+		long createdAt = now.getTime();
+
+		SharedPreferences defaultSharedPreferences = getDefaultSharedPreferences(getApplicationContext());
+		if (defaultSharedPreferences != null) {
+			SharedPreferences.Editor editor = defaultSharedPreferences.edit();
+			editor.putInt(getString(R.string.activity_state_key), 1);
+			editor.putLong(getString(R.string.activity_created_at_key), createdAt);
+			editor.apply(); // when this preferences value is used consider synchronous alternative: commit();
+			Log.i(className, "storeActivityCreatedAt: activity state (1) and activity created at " + createdAt + " were stored");
+		} else {
+			Log.e(className, "storeActivityCreatedAt: default shared preferences not found!");
+		}
+	}
+
+	private void clearActivityCreatedAt() {
+		SharedPreferences defaultSharedPreferences = getDefaultSharedPreferences(getApplicationContext());
+		if (defaultSharedPreferences != null) {
+			SharedPreferences.Editor editor = defaultSharedPreferences.edit();
+			editor.putInt(getString(R.string.activity_state_key), 0);
+			editor.putLong(getString(R.string.activity_created_at_key), 0);
+			editor.apply(); // when this preferences value is used consider synchronous alternative: commit();
+			Log.i(className, "clearActivityCreatedAt: cleared activity state (0) and activity created at");
+		} else {
+			Log.e(className, "clearActivityCreatedAt: default shared preferences not found!");
+		}
 	}
 
 	private void recreateBrowserView() {

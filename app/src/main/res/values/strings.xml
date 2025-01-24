@@ -6,7 +6,10 @@
     <string name="loading_video">Loading video</string>
     <string name="cookie_store">cookie.store</string>
     <string name="player_id_store">player.id.store</string>
-    <string name="preferences_file_name">biz.playr.PREFERENCE_FILE_KEY</string>
+    <string name="activity_state_key">activityState</string>
+    <string name="activity_created_at_key">activityCreatedAt</string>
+    <string name="boot_completed_at_key">bootCompletedAt</string>
+    <string name="preferences_file_name">biz.playr.preferences</string>
     <string name="playr_urls">www.playr.biz|play.playr.biz|playr.biz</string>
     <string name="player_id_cookie_name">playback_device_id</string>
     <string name="watchdog_name">Playr Watchdog</string>
