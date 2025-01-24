@@ -551,11 +551,32 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 	private void reportSystemInformation() {
-		Log.e(className, "***************************************");
-		Log.e(className, "***          API level: " + Build.VERSION.SDK_INT + "          ***");
-		Log.e(className, "***************************************");
+		Log.e(className, "********************************************");
+		Log.e(className, "***          System information          ***");
+		Log.e(className, "***          ------------------          ***");
+		Log.e(className, "***                                      ***");
+		Log.e(className, "***  Android API level: " + Build.VERSION.SDK_INT + "               ***");
+		Log.e(className, "***         build date: " + new Date(Build.TIME) + "               ***");
+		Log.e(className, "***      manufacturer : " + Build.MANUFACTURER + "               ***");
+		Log.e(className, "***             brand : " + Build.BRAND + "               ***");
+		Log.e(className, "***           product : " + Build.PRODUCT + "               ***");
+		Log.e(className, "***             model : " + Build.MODEL + "               ***");
+		Log.e(className, "***          hardware : " + Build.HARDWARE + "               ***");
+		Log.e(className, "***            device : " + Build.DEVICE + "               ***");
+		Log.e(className, "***             board : " + Build.BOARD + "               ***");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Log.e(className, "***  soc manufacturer : " + Build.SOC_MANUFACTURER + "               ***");
+			Log.e(className, "***         soc model : " + Build.SOC_MODEL + "               ***");
+        }
+		Log.e(className, "***                                      ***");
+		Log.e(className, "***         auto start: " + getResources().getBoolean(R.bool.auto_start) + "            ***");
+		Log.e(className, "***            restart: " + getResources().getBoolean(R.bool.restart) + "            ***");
+		Log.e(className, "***           app name: " + getString(R.string.appName) + "           ***");
+		Log.e(className, "***       version name: " + getString(R.string.versionName) + "            ***");
+		Log.e(className, "***           hostname: " + getString(R.string.hostName) + "      ***");
+		Log.e(className, "***                                      ***");
+		Log.e(className, "********************************************");
 	}
-
 	private void unBindServiceConnection() {
 		if (checkRestartService != null) {
 			checkRestartService.setCallbacks(null);
