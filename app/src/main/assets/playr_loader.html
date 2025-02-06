@@ -80,7 +80,9 @@
       document.getElementById("ajax_loader").style.display = "none";
       // Append Date param to ensure cache bypass
       var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version + "&ts=" + escape(new Date().getTime());
-      var timeoutHandle = setTimeout(function(){window.location = windowLocation;},2000);
+      var timeoutHandle = setTimeout(function() {
+        window.location = windowLocation;
+      } ,2000);
       console.error("gotoPlayer end");
     };
 
@@ -111,6 +113,10 @@
       document.getElementById("parameters").style.display = "block";
     };
 
+    function handleSpaces(text) {
+      return text.replace(/ /g, "&nbsp;").replace(/&nbsp;\(/g, "<br>(").replace(/\)&nbsp;/g, ")<br>");
+    }
+
     function listParameters() {
       "use strict";
       var result = "";
@@ -119,9 +125,10 @@
         if (keys[i].match(/player/i) && keys[i].match(/id/i)) {
           result += makeLineIfValueDefined(keys[i], queryString[keys[i]], function (text) { return obfuscateUUID(text); });
         } else {
-          result += makeLineIfValueDefined(keys[i], queryString[keys[i]], function (text) { return text.replace(/ /g, "&nbsp;").replace(/&nbsp;\(/g, "<br>(").replace(/\)&nbsp;/g, ")<br>"); });
+          result += makeLineIfValueDefined(keys[i], queryString[keys[i]], handleSpaces);
         }
       }
+      result += makeLineIfValueDefined("resolution", (window.innerWidth.toString() + "x" + window.innerHeight.toString()), handleSpaces);
       return result;
     };
 
