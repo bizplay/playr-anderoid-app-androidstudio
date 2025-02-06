@@ -1,6 +1,7 @@
 package biz.playr;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.UUID;
 
 import static android.view.WindowInsets.Type.navigationBars;
@@ -102,7 +103,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
-		Log.i(className, "onCreate: setup restarting of app on crash");
+		Log.i(className, "onCreate: setDefaultUncaughtExceptionHandler");
 		Thread.setDefaultUncaughtExceptionHandler(new DefaultExceptionHandler(this));
 
 		// Test exception handling by throwing an exception 20 seconds from now
@@ -551,6 +552,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 	private void reportSystemInformation() {
+		HashMap<String,String> versionInfo = versionInfo();
 		Log.e(className, "********************************************");
 		Log.e(className, "***          System information          ***");
 		Log.e(className, "***          ------------------          ***");
@@ -574,6 +576,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***           app name: " + getString(R.string.appName) + "           ***");
 		Log.e(className, "***       version name: " + getString(R.string.versionName) + "            ***");
 		Log.e(className, "***           hostname: " + getString(R.string.hostName) + "      ***");
+		Log.e(className, "***                                      ***");
+		Log.e(className, "***        app version: " + versionInfo.get("appVersion") + "           ***");
+		Log.e(className, "***    webview version: " + versionInfo.get("webviewVersion") + "            ***");
 		Log.e(className, "***                                      ***");
 		Log.e(className, "********************************************");
 	}
@@ -960,10 +965,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
-	private String pageUrl(String playerId, String webviewUserAgent) {
-		String webviewVersion = "Android System WebView not installed";
-		String appVersion = "app version not found";
-		Long versionCode;
+	private HashMap<String, String> versionInfo() {
+		HashMap<String, String> result = new HashMap<String, String>();
+		result.put("webviewVersion", "Android System WebView not installed");
+		result.put("appVersion", "App version not found");
+		long versionCode;
 		PackageManager pm = getPackageManager();
 		PackageInfo pi;
 		PackageInfo pi2;
@@ -971,19 +977,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			pi = pm.getPackageInfo("com.google.android.webview", 0);
 			if (pi != null) {
 				versionCode = PackageInfoCompat.getLongVersionCode(pi);
-				webviewVersion = "Version-name: " + pi.versionName
-						+ " -code: " + versionCode;
+				result.put("webviewVersion", "Version-name: " + pi.versionName + " -code: " + versionCode);
 			}
 			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 				pi2 = WebViewCompat.getCurrentWebViewPackage(MainActivity.this);
 				if (pi2 != null) {
 					versionCode = PackageInfoCompat.getLongVersionCode(pi2);
 					if (pi != null) {
-						webviewVersion += " (Version-name: " + pi2.versionName
-								+ " -code: " + versionCode + ")";
-					} else if (pi == null) {
-						webviewVersion = "Version-name: " + pi2.versionName
-								+ " -code: " + versionCode;
+						result.put("webviewVersion", result.get("webviewVersion") + "Version-name: " + pi2.versionName + " -code: " + versionCode);
+					} else {
+						result.put("webviewVersion", "Version-name: " + pi2.versionName + " -code: " + versionCode);
 					}
 				}
 			}
@@ -993,18 +996,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		try {
 			pi = pm.getPackageInfo(getPackageName(), 0);
 			if (pi != null) {
-				appVersion = pi.versionName;
+				result.put("appVersion", pi.versionName);
 			}
 		} catch (PackageManager.NameNotFoundException e) {
 			Log.e(className, getPackageName() + " is not found");
 		}
+		return result;
+	}
+
+	private String pageUrl(String playerId, String webviewUserAgent) {
+		HashMap<String, String> versionInfo = versionInfo();
 		// ignore preference of the OS for use of https
 		return Uri.parse("playr_loader.html").buildUpon()
 				.appendQueryParameter("player_id", playerId)
 				.appendQueryParameter("webview_user_agent", webviewUserAgent)
-				.appendQueryParameter("webview_version", webviewVersion)
+				.appendQueryParameter("webview_version", versionInfo.get("webviewVersion"))
 				.appendQueryParameter("https_required", "no")
-				.appendQueryParameter("app_version", appVersion).build()
+				.appendQueryParameter("app_version", versionInfo.get("appVersion")).build()
 				.toString();
 	};
 
