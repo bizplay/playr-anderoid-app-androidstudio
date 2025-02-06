@@ -125,6 +125,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 //		crs.startService();
 
 		// Set up looks of the view
+        // On TV devices, use FLAG_KEEP_SCREEN_ON to prevent the device from going into
+        // Ambient Mode during active video playback. If the foreground activity does not
+        // set FLAG_KEEP_SCREEN_ON, the device automatically enters Ambient Mode after a
+        // period of inactivity.
+        // Also important for other types of Android versions
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
 			getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
