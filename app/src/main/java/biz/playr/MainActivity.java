@@ -558,34 +558,37 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 	private void reportSystemInformation() {
 		HashMap<String,String> versionInfo = versionInfo();
-		Log.e(className, "********************************************");
-		Log.e(className, "***          System information          ***");
-		Log.e(className, "***          ------------------          ***");
-		Log.e(className, "***                                      ***");
-		Log.e(className, "***  Android API level: " + Build.VERSION.SDK_INT + "               ***");
-		Log.e(className, "***         build date: " + new Date(Build.TIME) + "               ***");
-		Log.e(className, "***      manufacturer : " + Build.MANUFACTURER + "               ***");
-		Log.e(className, "***             brand : " + Build.BRAND + "               ***");
-		Log.e(className, "***           product : " + Build.PRODUCT + "               ***");
-		Log.e(className, "***             model : " + Build.MODEL + "               ***");
-		Log.e(className, "***          hardware : " + Build.HARDWARE + "               ***");
-		Log.e(className, "***            device : " + Build.DEVICE + "               ***");
-		Log.e(className, "***             board : " + Build.BOARD + "               ***");
+		Log.e(className, "***************************************************************");
+		Log.e(className, "***                  System information                     ***");
+		Log.e(className, "***  -----------------------------------------------------  ***");
+		Log.e(className, "***                                                         ***");
+		Log.e(className, "***  Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 36) + "***");
+		Log.e(className, "*** Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 36) + "***");
+		Log.e(className, "***       manufacturer: " + paddedOut(Build.MANUFACTURER, 36) + "***");
+		Log.e(className, "***              brand: " + paddedOut(Build.BRAND, 36) + "***");
+		Log.e(className, "***            product: " + paddedOut(Build.PRODUCT, 36) + "***");
+		Log.e(className, "***              model: " + paddedOut(Build.MODEL, 36) + "***");
+		Log.e(className, "***           hardware: " + paddedOut(Build.HARDWARE, 36) + "***");
+		Log.e(className, "***             device: " + paddedOut(Build.DEVICE, 36) + "***");
+		Log.e(className, "***              board: " + paddedOut(Build.BOARD, 36) + "***");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Log.e(className, "***  soc manufacturer : " + Build.SOC_MANUFACTURER + "               ***");
-			Log.e(className, "***         soc model : " + Build.SOC_MODEL + "               ***");
+            Log.e(className, "***   soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 36) + "***");
+			Log.e(className, "***          soc model: " + paddedOut(Build.SOC_MODEL, 36) + "***");
         }
-		Log.e(className, "***                                      ***");
-		Log.e(className, "***         auto start: " + getResources().getBoolean(R.bool.auto_start) + "            ***");
-		Log.e(className, "***            restart: " + getResources().getBoolean(R.bool.restart) + "            ***");
-		Log.e(className, "***           app name: " + getString(R.string.appName) + "           ***");
-		Log.e(className, "***       version name: " + getString(R.string.versionName) + "            ***");
-		Log.e(className, "***           hostname: " + getString(R.string.hostName) + "      ***");
-		Log.e(className, "***                                      ***");
-		Log.e(className, "***        app version: " + versionInfo.get("appVersion") + "           ***");
-		Log.e(className, "***    webview version: " + versionInfo.get("webviewVersion") + "            ***");
-		Log.e(className, "***                                      ***");
-		Log.e(className, "********************************************");
+		Log.e(className, "***                                                         ***");
+		Log.e(className, "***         auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 36) + "***");
+		Log.e(className, "***            restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 36) + "***");
+		Log.e(className, "***           app name: " + paddedOut(getString(R.string.appName), 36) + "***");
+		Log.e(className, "***       version name: " + paddedOut(getString(R.string.versionName), 36) + "***");
+		Log.e(className, "***           hostname: " + paddedOut(getString(R.string.hostName), 36) + "***");
+		Log.e(className, "***                                                         ***");
+		Log.e(className, "***        app version: " + paddedOut(versionInfo.get("appVersion"), 36) + "***");
+		Log.e(className, "***    webview version: " + paddedOut(versionInfo.get("webviewVersion"), 36) + "***");
+		Log.e(className, "***                                                         ***");
+		Log.e(className, "***************************************************************");
+	}
+	private String paddedOut(String text, int length) {
+		return String.format("%-" + length + "s", text);
 	}
 	private void unBindServiceConnection() {
 		if (checkRestartService != null) {
@@ -692,13 +695,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		result.setWebViewClient(createWebViewClient());
 		result.setKeepScreenOn(true);
 		// Make sure necessary cookies are accepted
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			CookieManager cookieManager = CookieManager.getInstance();
-			cookieManager.setAcceptCookie(true);
-			cookieManager.setAcceptThirdPartyCookies(result, true);
-			if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-				CookieManager.setAcceptFileSchemeCookies(true);
-			}
+		CookieManager cookieManager = CookieManager.getInstance();
+		cookieManager.setAcceptCookie(true);
+		cookieManager.setAcceptThirdPartyCookies(result, true);
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+			CookieManager.setAcceptFileSchemeCookies(true);
 		}
 		if (initialiseWebContent) {
 			result.loadDataWithBaseURL("file:///android_asset/",
@@ -754,7 +755,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
-	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 	private boolean isAndroidTV() {
 		UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
 		return uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
@@ -886,11 +886,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			@Override
 			public WebResourceResponse shouldInterceptRequest(WebView view,
 															  WebResourceRequest request) {
-				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-					return assetLoader.shouldInterceptRequest(request.getUrl());
-				} else {
-					return super.shouldInterceptRequest(view, request);
-				}
+				return assetLoader.shouldInterceptRequest(request.getUrl());
 			}
 		};
 	};
@@ -1016,7 +1012,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				.appendQueryParameter("player_id", playerId)
 				.appendQueryParameter("webview_user_agent", webviewUserAgent)
 				.appendQueryParameter("webview_version", versionInfo.get("webviewVersion"))
-				.appendQueryParameter("https_required", "no")
+				.appendQueryParameter("https_required", httpsRequired())
 				.appendQueryParameter("app_version", versionInfo.get("appVersion")).build()
 				.toString();
 	};
@@ -1256,11 +1252,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void finishAndRemoveTaskCompat() {
-		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			this.finishAndRemoveTask();
-		} else {
-			this.finish();
-		}
+		this.finishAndRemoveTask();
 	}
 
 	private String httpsRequired() {

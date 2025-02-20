@@ -3,8 +3,8 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "2.9.6",
-        versionCode: 45,
+        versionName: "3.0.2",
+        versionCode: 46,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -36,15 +36,15 @@ allprojects {
 }
 
 android {
-    compileSdk 34
+    compileSdk 35
     namespace 'biz.playr'
 
     defaultConfig {
         applicationId appManifest.applicationId
         versionCode appManifest.versionCode
         versionName appManifest.versionName
-        minSdkVersion 19
-        targetSdkVersion 34
+        minSdkVersion 21
+        targetSdkVersion 35
 
         // The name for the application on the Android Launcher
         resValue "string", "appName", appManifest.name
@@ -113,7 +113,11 @@ android {
 //        resValue "integer", "splashScreenFadeOutDuration", appManifest.splashScreenFadeOutDuration.toString()
 
     }
-
+    configurations {
+        configureEach {
+            exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled true
@@ -154,21 +158,17 @@ android {
 dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.leanback:leanback:1.0.0'
-    // recyclerview 1.4.0 has min SDK version 21, version 1.3.2 seems newest with support for API level 19
-    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.cardview:cardview:1.0.0'
-    // webkit 1.12.1 has min SDK version 21, version 1.11.0 seems newest with support for API level 19
-    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.webkit:webkit:1.12.1'
 //    implementation 'androidx.browser:browser:1.2.0'
     implementation 'androidx.preference:preference:1.2.1'
-    // webkit 1.15.0 has min SDK version 21, version 1.13.1 seems newest with support for API level 19
 //    implementation 'androidx.core:core:1.13.1'
 
     // From TwaDemoJava demo project (also including maven
     // in the build.gradle in the /gradle folder to enable
     // inclusion of code from GitHub)
-    // appcompat 1.7.0 has min SDK version 21, version 1.6.1 seems newest with support for API level 19
-    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
 //    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
 //    implementation 'com.google.android.material:material:1.1.0'
 //    testImplementation 'junit:junit:4.12'

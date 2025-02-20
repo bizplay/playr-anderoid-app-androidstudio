@@ -48,10 +48,14 @@
 	<!--<uses-permission android:name="android.permission.GET_TASKS"/>-->
 	<!-- WAKE_LOCK is used by the media player inside WebView/Chromium -->
 	<uses-permission android:name="android.permission.WAKE_LOCK"/>
-	<!-- Manage overlay permission, needed for restart on API Q and newer -->
-<!--	<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION"/>-->
-<!--	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>-->
-<!--	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>-->
+	<!-- System alert window and Manage overlay permissions, needed for
+	     automatic restart on API Q (level 29, Android 10) and newer. On API W
+	     (level 35, Android 15) this is even further restricted
+	-->
+	<!--<uses-permission android:name="android.permission.ACTION_MANAGE_OVERLAY_PERMISSION"/>-->
+	<!--<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>-->
+	<!--  Non exact scheduled alarms are sufficient -->
+	<!--<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>-->
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application
