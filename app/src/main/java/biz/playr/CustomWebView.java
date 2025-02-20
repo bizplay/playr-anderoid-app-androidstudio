@@ -88,7 +88,6 @@ public class CustomWebView extends WebView {
         myContext=context;
         this.setLongClickable(false);
     }
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes)
     {
         super(context, attributeSet, defStyleAttr, defStyleRes);
