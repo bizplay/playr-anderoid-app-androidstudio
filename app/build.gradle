@@ -4,7 +4,7 @@ def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
         versionName: "3.0.2",
-        versionCode: 46,
+        versionCode: 47,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
