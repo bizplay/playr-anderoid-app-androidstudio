@@ -1257,7 +1257,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private String httpsRequired() {
 		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
+			// For Android version lower than 6 API level 23, https is not required
 			return "no";
+		} if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+			// For Android versions greater than or equal 9 API level 28, only https is allowed
+			// Since isCleartextTrafficPermitted() returns true on some devices running
+			// Android 9 or higher, no check is performed
+			return "yes";
 		} else {
 			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
 		}
