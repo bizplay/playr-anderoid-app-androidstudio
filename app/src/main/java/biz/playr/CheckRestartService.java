@@ -167,17 +167,26 @@ public class CheckRestartService extends Service {
 		}
 
 		if (!playerId.isEmpty()) {
+			InputStream inputStream = null;
 			try {
 				URL url = new URL("https://ajax.playr.biz/watchdogs/" + playerId + "/command");
-				Log.i(className, ".checkServerForRestart URL: " + url.toString());
+				Log.i(className, ".checkServerForRestart URL: " + url);
 				urlConnection = (HttpURLConnection) url.openConnection();
-				InputStream inputStream = new BufferedInputStream(urlConnection.getInputStream());
+				inputStream = new BufferedInputStream(urlConnection.getInputStream());
 				response = readStream(inputStream).trim();
 			} catch (MalformedURLException e) {
 				Log.e(className, ".checkServerForRestart: malformed URL exception opening connection; " + e.getMessage());
 			} catch (IOException e) {
 				Log.e(className, ".checkServerForRestart: IO exception opening connection; " + e.getMessage());
 			} finally {
+				if (inputStream != null) {
+					try {
+						inputStream.close();
+					} catch (IOException e) {
+						Log.e(className, ".checkServerForRestart: IO exception closing connection; " + e.getMessage());
+					}
+				}
+				assert urlConnection != null;
 				urlConnection.disconnect();
 			}
 			Log.i(className, ".checkServerForRestart response: " + response);
