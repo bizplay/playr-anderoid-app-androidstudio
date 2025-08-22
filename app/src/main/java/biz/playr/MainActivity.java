@@ -30,6 +30,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.StrictMode;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
@@ -87,9 +88,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	// https://stackoverflow.com/a/63707709
 	// and https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
 	private final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
-			.addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-			.addPathHandler("/res/", new WebViewAssetLoader.ResourcesPathHandler(this))
-			.build();
+																		.addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+																		.addPathHandler("/res/", new WebViewAssetLoader.ResourcesPathHandler(this))
+																		.build();
 
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
@@ -99,6 +100,29 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "override onCreate");
 		currentSavedInstanceState = savedInstanceState;
 		super.onCreate(savedInstanceState);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			// Use Strict Mode in order to detect problems with the use of Intents
+			// for now detectAll, later detectUnsafeIntentLaunch is probably enough
+			StrictMode.setThreadPolicy(
+					new StrictMode.ThreadPolicy.Builder()
+							.detectAll()
+							.penaltyLog()
+							.build()
+			);
+			StrictMode.setVmPolicy(
+					new StrictMode.VmPolicy.Builder()
+							.detectAll()
+							.penaltyLog()
+							.build()
+			);
+//		StrictMode.setVmPolicy(
+//				new StrictMode.VmPolicy.Builder()
+//											.detectBlockedBackgroundActivityLaunch()
+//											.detectUnsafeIntentLaunch()
+//											.penaltyLog()
+//											.build()
+//		);
+		}
 
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		reportSystemInformation();
