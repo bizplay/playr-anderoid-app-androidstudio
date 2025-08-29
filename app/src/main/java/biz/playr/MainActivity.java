@@ -367,7 +367,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	@Override
-	protected void onSaveInstanceState(Bundle outState) {
+	protected void onSaveInstanceState(@NonNull Bundle outState) {
 		Log.i(className, "override onSaveInstanceState");
 		super.onSaveInstanceState(outState);
 		if (webView != null) { webView.saveState(outState); }
@@ -375,10 +375,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	@Override
-	protected void onRestoreInstanceState(Bundle savedInstanceState) {
+	protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
 		Log.i(className, "override onRestoreInstanceState");
 		super.onRestoreInstanceState(savedInstanceState);
-		if (savedInstanceState != null && !savedInstanceState.isEmpty()) {
+		if (!savedInstanceState.isEmpty()) {
 			if (webView != null) { webView.restoreState(savedInstanceState); }
 			this.twaWasLaunched = savedInstanceState.getBoolean(MainActivity.TWA_WAS_LAUNCHED_KEY);
 		}
@@ -410,8 +410,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// bind to CheckRestartService
 			Intent intent = new Intent(this, CheckRestartService.class);
 //			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
-			// checkRestartService = TODO how do we point this attribute to the service instance
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
+      } else {
+				bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE);
+			}
+      // checkRestartService = TODO how do we point this attribute to the service instance
 			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
 			bound = true;
 		} else if (this.webView != null) {
@@ -420,8 +424,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 			Intent intent = new Intent(this, CheckRestartService.class);
 //			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-			bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
-			Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
+      } else {
+				bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE);
+			}
+      Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
 			bound = true;
 			if (this.checkRestartService == null) {
 				Log.e(className, "onStart: checkRestartService is null after bindService.");
@@ -858,7 +866,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
 				}
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					if ("net::".equals(error.getDescription().subSequence(0,5))) {
+					if ("net::".contentEquals(error.getDescription().subSequence(0,5))) {
 						if (error.getErrorCode() == WebViewClient.ERROR_TOO_MANY_REQUESTS || error.getErrorCode() == WebViewClient.ERROR_REDIRECT_LOOP) {
 							// escalate since app will freeze with these errors
 							super.onReceivedError(view, request, error);
@@ -879,7 +887,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// Log.i(className, "override onReceivedError");
 				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
 				Log.e(className, "onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
-				if ("net::".equals(description.subSequence(0,5))) {
+				if ("net::".contentEquals(description.subSequence(0,5))) {
 					if (errorCode == WebViewClient.ERROR_TOO_MANY_REQUESTS || errorCode == WebViewClient.ERROR_REDIRECT_LOOP) {
 						// escalate since app will freeze with these errors
 						super.onReceivedError(view, errorCode, description, failingUrl);

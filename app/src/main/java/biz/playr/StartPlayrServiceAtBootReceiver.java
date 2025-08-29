@@ -10,7 +10,7 @@ public class StartPlayrServiceAtBootReceiver extends BroadcastReceiver {
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		Log.i(className, "overide onReceive");
+		Log.i(className, "override onReceive");
 		Log.i(className,".onReceive, received intent:" + intent.getAction());
 		if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
 			Intent serviceIntent = new Intent(context, biz.playr.PlayrService.class);

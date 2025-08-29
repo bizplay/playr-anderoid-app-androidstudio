@@ -109,7 +109,7 @@ public class PersistService extends Service {
 			}
 		};
 		timer = new Timer();
-		timer.scheduleAtFixedRate(task, intervalBetweenForegroundChecks, intervalBetweenForegroundChecks);
+		timer.schedule(task, intervalBetweenForegroundChecks, intervalBetweenForegroundChecks);
 	}
 
 	@Override

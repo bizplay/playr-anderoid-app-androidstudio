@@ -98,7 +98,8 @@ public class CustomWebView extends WebView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         Log.i(className, "override onTouchEvent, delegate to onTouch or super");
-        return (onTouchListener.onTouch(this, event) || super.onTouchEvent(event));
+//        return (onTouchListener.onTouch(this, event) || super.onTouchEvent(event));
+        return performClick();
     }
 
     @Override
