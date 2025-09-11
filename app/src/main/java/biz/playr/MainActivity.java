@@ -102,27 +102,37 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onCreate(savedInstanceState);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 			// Use Strict Mode in order to detect problems with the use of Intents
-			// for now detectAll, later detectUnsafeIntentLaunch is probably enough
-			StrictMode.setThreadPolicy(
-					new StrictMode.ThreadPolicy.Builder()
-							.detectAll()
-							.penaltyLog()
-							.build()
-			);
-			StrictMode.setVmPolicy(
-					new StrictMode.VmPolicy.Builder()
-							.detectAll()
-							.penaltyLog()
-							.build()
-			);
-//		StrictMode.setVmPolicy(
-//				new StrictMode.VmPolicy.Builder()
-//											.detectBlockedBackgroundActivityLaunch()
-//											.detectUnsafeIntentLaunch()
-//											.penaltyLog()
-//											.build()
-//		);
-		}
+// detect all types of errors in usage of threads, log them and kill the app
+// find the errors in the logs by searching for StrictMode
+//			StrictMode.setThreadPolicy(
+//					new StrictMode.ThreadPolicy.Builder()
+//							.detectAll()
+//							.penaltyLog()
+//							.penaltyDeath()
+//							.build()
+//			);
+// detect errors in vm policies, log them and kill the app
+// instead of the specific errors you can use .detactAll()
+// find the errors in the logs by searching for StrictMode
+//      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+//        StrictMode.setVmPolicy(
+//            new StrictMode.VmPolicy.Builder()
+//                          .detectBlockedBackgroundActivityLaunch()
+//                          .detectUnsafeIntentLaunch()
+//                          .penaltyLog()
+//													.penaltyDeath()
+//                          .build()
+//        );
+//      } else {
+//				StrictMode.setVmPolicy(
+//						new StrictMode.VmPolicy.Builder()
+//													.detectUnsafeIntentLaunch()
+//													.penaltyLog()
+//													.penaltyDeath()
+//													.build()
+//				);
+//			}
+//    }
 
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		reportSystemInformation();
