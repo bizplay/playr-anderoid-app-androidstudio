@@ -16,7 +16,14 @@ def appManifest = [
         // See: https://developer.android.com/google/play/publishing/multiple-apks#VersionCodes
         // A simpler scheme is also possible (all future 2.x releases number up from where
         // they are until 99, all 3.x and higher versions use 100 and up)
-        versionCode: 3621302,
+        // Since it is unsure if we need to release updates to the older version of the app,
+        // that uses API level 19 (and will not be updated by the OS when we release this version
+        // of the app) and if that is possible by releasing a version of the app with a versionCode
+        // higher than 48 and min. API level 19 we will use a simpler versionCode for now, one that
+        // leaves enough "space" for possible updates to the "old" version of the app (with level 19
+        // support) ie we make the versioncode 302 and up for the new version and have versionCode
+        // 49-299 for the "old" version
+        versionCode: 302,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -130,6 +137,18 @@ android {
             exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
         }
     }
+    // The resource values auto_start and restart can be accessed in the Java code by calling
+    // context.getResources().getBoolean(R.bool.auto_start)
+    // Setting auto_start to true will make the application start automatically when the device is
+    // started for professional displays this might interfere with the functionality to start a
+    // specific application when the device is turned on. That is why this resource is set to false
+    // for the ProDisplay build
+    // Setting restart will cause the app to try to relaunch itself after 30 seconds when it is
+    // closed (by the user or system (after an exception) since this can lead to unwanted loops
+    // this is also set to false in the ProDisplay build
+    // NB: The restart option does not influence the restart that the watchdog issues since that is
+    // done deliberately. It can turn out that setting the restart option to false is also a better
+    // default for the normal build
     buildTypes {
         release {
             minifyEnabled true
