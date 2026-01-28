@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 def appManifest = [
         applicationId: "biz.playr",
         name: 'Playr', // The name shown on the Android Launcher.
-        versionName: "3.0.2",
+        versionName: "3.0.4",
         //////////////////////////////////////////////////////////////////////////
         // new versionCode scheme is necessary since we might have to update the
         // app that uses minSdkVersion 19, versionCode needs to increase for the
@@ -23,7 +23,7 @@ def appManifest = [
         // leaves enough "space" for possible updates to the "old" version of the app (with level 19
         // support) ie we make the versioncode 302 and up for the new version and have versionCode
         // 49-299 for the "old" version
-        versionCode: 302,
+        versionCode: 304,
         themeColor: '#303F9F', // The color used for the status bar.
         navigationColor: '#303F9F', // The color used for the navigation bar.
         backgroundColor: '#bababa', // The color used for the splash screen background.
@@ -153,14 +153,14 @@ android {
         release {
             minifyEnabled true
             debuggable false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
             resValue "bool", "auto_start", "true"
             resValue "bool", "restart", "true"
         }
         releaseProDisplay {
             minifyEnabled true
             debuggable false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
             resValue "bool", "auto_start", "false"
             resValue "bool", "restart", "false"
             resValue "string", "appName", appManifest.name + "ForProDisplay"
@@ -168,7 +168,7 @@ android {
         debug {
             minifyEnabled false
             debuggable true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
             jniDebuggable true
             renderscriptDebuggable true
             renderscriptOptimLevel = 3
@@ -189,6 +189,7 @@ dependencies {
     implementation 'androidx.leanback:leanback:1.2.0'
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.cardview:cardview:1.0.0'
+    // version 1.14.0 is the latest version that supports SDK version 21
     implementation 'androidx.webkit:webkit:1.14.0'
 //    implementation 'androidx.browser:browser:1.2.0'
     implementation 'androidx.preference:preference:1.2.1'
