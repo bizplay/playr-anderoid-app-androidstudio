@@ -816,7 +816,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private WebChromeClient createWebChromeClient() {
 		return new WebChromeClient() {
-			private String className = "biz.playr.WebChromeClie";
+			private final String className = "biz.playr.WebChromeClie";
 			// private int count = 0;
 
 			@Override
@@ -856,17 +856,48 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// have any iframe within the page with a custom scheme URL
 			// (say <iframe src="tel:123"/>) it will navigate your app's
 			// main frame to that URL most likely breaking the app as a side effect.
-			public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-				Log.i(className, "shouldOverrideUrlLoading");
+      @Override
+      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+        Log.i(className, "shouldOverrideUrlLoading - request url: " + request.getUrl());
 				return false; // then it is not handled by default action
+//        return super.shouldOverrideUrlLoading(view, request);
 			}
 			// This version of this method is deprecated from API level 24
-			public boolean shouldOverrideUrlLoading(WebView view, String url) {
-				Log.i(className, "shouldOverrideUrlLoading");
+      @Override
+      public boolean shouldOverrideUrlLoading(WebView view, String url) {
+				Log.i(className, "shouldOverrideUrlLoading - url: " + url);
 				return false; // then it is not handled by default action
+//        return super.shouldOverrideUrlLoading(view, url);
 			}
+      // see https://stackoverflow.com/a/63707709
+      // https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
+      @Override
+      public WebResourceResponse shouldInterceptRequest(WebView view,
+                                                        WebResourceRequest request) {
+        //Log.i(className, "shouldInterceptRequest - request url: " + request.getUrl());
+        return assetLoader.shouldInterceptRequest(request.getUrl());
+      }
+      // option to redirect/redefine the URL that is used to get a resource
+//      @Override
+//      public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+//        if (request != null && request.getUrl() != null && request.getMethod().equalsIgnoreCase("get")) {
+//          String scheme = request.getUrl().getScheme().trim();
+//          if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) {
+//            try {
+//              URL url = new URL(injectIsParams(request.getUrl().toString()));
+//              URLConnection connection = url.openConnection();
+//              return new WebResourceResponse(connection.getContentType(), connection.getHeaderField("encoding"), connection.getInputStream());
+//            } catch (MalformedURLException e) {
+//              e.printStackTrace();
+//            } catch (IOException e) {
+//              e.printStackTrace();
+//            }
+//          }
+//        }
+//        return null;
+//      }
 
-			// This version of this method is added in API level 23
+      // This version of this method is added in API level 23
 			@Override
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
 				// Log.i(className, "override onReceivedError");
@@ -921,14 +952,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 							+ " URL: " + request.getUrl().toString());
 				}
 				super.onReceivedHttpError(view, request, errorResponse);
-			}
-
-			// see https://stackoverflow.com/a/63707709
-			// https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
-			@Override
-			public WebResourceResponse shouldInterceptRequest(WebView view,
-															  WebResourceRequest request) {
-				return assetLoader.shouldInterceptRequest(request.getUrl());
 			}
 		};
 	};
@@ -1054,7 +1077,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				.appendQueryParameter("player_id", playerId)
 				.appendQueryParameter("webview_user_agent", webviewUserAgent)
 				.appendQueryParameter("webview_version", versionInfo.get("webviewVersion"))
-				.appendQueryParameter("https_required", httpsRequired())
+				.appendQueryParameter("https_required", (httpsRequired() ? "yes" : "no"))
 				.appendQueryParameter("app_version", versionInfo.get("appVersion")).build()
 				.toString();
 	};
@@ -1120,7 +1143,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 			webSettings.setLoadsImagesAutomatically(true);
 			webSettings.setBlockNetworkImage(false);
-			webSettings.setSupportMultipleWindows(false);
+      webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+      webSettings.setSupportMultipleWindows(false);
 			webSettings.setMediaPlaybackRequiresUserGesture(false);
 			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
 			webSettings.setBuiltInZoomControls(false);
@@ -1297,17 +1321,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		this.finishAndRemoveTask();
 	}
 
-	private String httpsRequired() {
+	private boolean httpsRequired() {
 		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
 			// For Android version lower than 6 API level 23, https is not required
-			return "no";
+			return false;
 		} if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
 			// For Android versions greater than or equal 9 API level 28, only https is allowed
 			// Since isCleartextTrafficPermitted() returns true on some devices running
 			// Android 9 or higher, no check is performed
-			return "yes";
+			return true;
 		} else {
-			return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted() ? "no" : "yes";
+			return !NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted();
 		}
 	}
 }

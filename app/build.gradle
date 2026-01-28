@@ -153,14 +153,14 @@ android {
         release {
             minifyEnabled true
             debuggable false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             resValue "bool", "auto_start", "true"
             resValue "bool", "restart", "true"
         }
         releaseProDisplay {
             minifyEnabled true
             debuggable false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             resValue "bool", "auto_start", "false"
             resValue "bool", "restart", "false"
             resValue "string", "appName", appManifest.name + "ForProDisplay"
@@ -168,7 +168,6 @@ android {
         debug {
             minifyEnabled false
             debuggable true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.txt'
             jniDebuggable true
             renderscriptDebuggable true
             renderscriptOptimLevel = 3
