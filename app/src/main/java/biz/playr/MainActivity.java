@@ -297,6 +297,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	/**
 	 * Release memory when the UI becomes hidden or when system resources become low.
 	 * @param level the memory-related event that was raised.
+	 * Possible values (see {@link ComponentCallbacks2}):
+	 * <ul>
+	 *   <li>5 — {@link ComponentCallbacks2#TRIM_MEMORY_RUNNING_MODERATE} — (deprecated API 35; not delivered since API 34) process is not expendable; device is moderately low on memory.</li>
+	 *   <li>10 — {@link ComponentCallbacks2#TRIM_MEMORY_RUNNING_LOW} — (deprecated API 35; not delivered since API 34) process is not expendable; device is running low on memory.</li>
+	 *   <li>15 — {@link ComponentCallbacks2#TRIM_MEMORY_RUNNING_CRITICAL} — (deprecated API 35; not delivered since API 34) process is not expendable; device is extremely low on memory; free as much non-critical memory as possible.</li>
+	 *   <li>20 — {@link ComponentCallbacks2#TRIM_MEMORY_UI_HIDDEN} — UI is no longer visible; release large UI-only allocations.</li>
+	 *   <li>40 — {@link ComponentCallbacks2#TRIM_MEMORY_BACKGROUND} — process is on the LRU list and eligible to be killed; release rebuildable resources.</li>
+	 *   <li>60 — {@link ComponentCallbacks2#TRIM_MEMORY_MODERATE} — (deprecated API 35; not delivered since API 34) process is around the middle of the background LRU list.</li>
+	 *   <li>80 — {@link ComponentCallbacks2#TRIM_MEMORY_COMPLETE} — (deprecated API 35; not delivered since API 34) process is near the end of the background LRU list and may be killed soon.</li>
+	 * </ul>
+	 * From API 34, focus on {@code TRIM_MEMORY_UI_HIDDEN} and {@code TRIM_MEMORY_BACKGROUND}. Compare with {@code >=}, not exact equality, because intermediate levels may be added.
 	 */
 	// original onTrimMemory(int level) functionality lead to crashes
 	// it turns out that on some players this method is called frequently (less than 0.1 seconds apart)
@@ -307,7 +318,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
 		MemoryStatus memoryStatus = analyseMemoryStatus();
-		Log.e(className, ".\n***************************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + memoryStatus + "\n***************************************************************************************\n.");
+		Log.e(className, ".\n********************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + memoryStatus + "\n********************************************************************************\n.");
 
 		// Determine which lifecycle or system event was raised.
 		switch (level) {
@@ -600,34 +611,34 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 	private void reportSystemInformation() {
 		HashMap<String,String> versionInfo = versionInfo();
-		Log.e(className, "***************************************************************");
-		Log.e(className, "***                  System information                     ***");
-		Log.e(className, "***  -----------------------------------------------------  ***");
-		Log.e(className, "***                                                         ***");
-		Log.e(className, "***  Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 36) + "***");
-		Log.e(className, "*** Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 36) + "***");
-		Log.e(className, "***       manufacturer: " + paddedOut(Build.MANUFACTURER, 36) + "***");
-		Log.e(className, "***              brand: " + paddedOut(Build.BRAND, 36) + "***");
-		Log.e(className, "***            product: " + paddedOut(Build.PRODUCT, 36) + "***");
-		Log.e(className, "***              model: " + paddedOut(Build.MODEL, 36) + "***");
-		Log.e(className, "***           hardware: " + paddedOut(Build.HARDWARE, 36) + "***");
-		Log.e(className, "***             device: " + paddedOut(Build.DEVICE, 36) + "***");
-		Log.e(className, "***              board: " + paddedOut(Build.BOARD, 36) + "***");
+		Log.e(className, "********************************************************************************");
+		Log.e(className, "***                            System information                            ***");
+		Log.e(className, "***                            ==================                            ***");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "***  Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 53) + "***");
+		Log.e(className, "*** Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 53) + "***");
+		Log.e(className, "***       manufacturer: " + paddedOut(Build.MANUFACTURER, 53) + "***");
+		Log.e(className, "***              brand: " + paddedOut(Build.BRAND, 53) + "***");
+		Log.e(className, "***            product: " + paddedOut(Build.PRODUCT, 53) + "***");
+		Log.e(className, "***              model: " + paddedOut(Build.MODEL, 53) + "***");
+		Log.e(className, "***           hardware: " + paddedOut(Build.HARDWARE, 53) + "***");
+		Log.e(className, "***             device: " + paddedOut(Build.DEVICE, 53) + "***");
+		Log.e(className, "***              board: " + paddedOut(Build.BOARD, 53) + "***");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Log.e(className, "***   soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 36) + "***");
-			Log.e(className, "***          soc model: " + paddedOut(Build.SOC_MODEL, 36) + "***");
+            Log.e(className, "***   soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 53) + "***");
+			Log.e(className, "***          soc model: " + paddedOut(Build.SOC_MODEL, 53) + "***");
         }
-		Log.e(className, "***                                                         ***");
-		Log.e(className, "***         auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 36) + "***");
-		Log.e(className, "***            restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 36) + "***");
-		Log.e(className, "***           app name: " + paddedOut(getString(R.string.appName), 36) + "***");
-		Log.e(className, "***       version name: " + paddedOut(getString(R.string.versionName), 36) + "***");
-		Log.e(className, "***           hostname: " + paddedOut(getString(R.string.hostName), 36) + "***");
-		Log.e(className, "***                                                         ***");
-		Log.e(className, "***        app version: " + paddedOut(versionInfo.get("appVersion"), 36) + "***");
-		Log.e(className, "***    webview version: " + paddedOut(versionInfo.get("webviewVersion"), 36) + "***");
-		Log.e(className, "***                                                         ***");
-		Log.e(className, "***************************************************************");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "***         auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 53) + "***");
+		Log.e(className, "***            restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 53) + "***");
+		Log.e(className, "***           app name: " + paddedOut(getString(R.string.appName), 53) + "***");
+		Log.e(className, "***       version name: " + paddedOut(getString(R.string.versionName), 53) + "***");
+		Log.e(className, "***           hostname: " + paddedOut(getString(R.string.hostName), 53) + "***");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "***        app version: " + paddedOut(versionInfo.get("appVersion"), 53) + "***");
+		Log.e(className, "***    webview version: " + paddedOut(versionInfo.get("webviewVersion"), 53) + "***");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "********************************************************************************");
 	}
 	private String paddedOut(String text, int length) {
 		return String.format("%-" + length + "s", text);
@@ -987,8 +998,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
 				"***************************************************************************************\n.");
 		return result;
-
-
 	}
 
 	private MemoryStatus calculateMemoryStatus(long availableMemory, long threshold) {
@@ -1145,7 +1154,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			webSettings.setBlockNetworkImage(false);
       webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
       webSettings.setSupportMultipleWindows(false);
-			webSettings.setMediaPlaybackRequiresUserGesture(false);
+      webSettings.setMediaPlaybackRequiresUserGesture(false);
 			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
 			webSettings.setBuiltInZoomControls(false);
 			webSettings.setDisplayZoomControls(false);
