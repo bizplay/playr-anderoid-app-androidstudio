@@ -2,21 +2,12 @@ package biz.playr;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import android.app.Activity;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
-import android.content.Context;
-import android.content.Intent;
 import android.util.Log;
 /*
  * see http://chintanrathod.com/auto-restart-application-after-crash-forceclose-in-android/
  */
 class DefaultExceptionHandler implements UncaughtExceptionHandler {
 	private static final String className = "biz.playr.DefaultExcept";
-	// the restart delay is relatively long because this also affects the
-	// time a user has when changing a setting or using any other app
-	// since that will trigger a restart in the MainActivity that uses
-	// the same restartDelay
-	static final long restartDelay = 30000; // 30 seconds in milliseconds
 	private final Activity activity;
 	private final Thread.UncaughtExceptionHandler defaultUEH;
 
@@ -54,27 +45,11 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 			}
 
 			if (getActivity().getApplicationContext().getResources().getBoolean(R.bool.restart)) {
-				Log.i(className,".uncaughtException -> restart after delay");
-
-				Intent intent = new Intent(activity, biz.playr.MainActivity.class);
-				intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-						| Intent.FLAG_ACTIVITY_CLEAR_TASK
-						| Intent.FLAG_ACTIVITY_NEW_TASK);
-				intent.setAction(Intent.ACTION_MAIN);
-				intent.addCategory(Intent.CATEGORY_LAUNCHER);
-				// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
-				PendingIntent pendingIntent = PendingIntent.getActivity(
-						biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
-				//Following code will restart your application after <delay> seconds
-				AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
-				mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + restartDelay, pendingIntent);
-				//This will finish your activity manually
-				Log.e(className,"uncaughtException: activity.finish() !!! About to restart application !!!");
+				Log.i(className, ".uncaughtException -> immediate relaunch");
+				AppRestarter.restartImmediateRelaunch(getActivity(), false);
+				Log.e(className, "uncaughtException: activity.finish() !!! About to restart application !!!");
 				getActivity().finish();
 				defaultUEH.uncaughtException(thread, ex);
-				//This will stop your application and take out from it.
-//				Log.e(className,"uncaughtException: System.exit(2) !!! About to restart application !!!");
-//				System.exit(2);
 			} else {
 				// Pro Display usage; no restart of the MainActivity
 				Log.i(className, ".uncaughtException MainActivity NOT started");

@@ -116,7 +116,7 @@ public class CheckRestartService extends Service {
 					if (serviceCallbacks != null) {
 						Log.i(className, ".run: restarting MainActivity");
 						// use force=true to make sure the MainActivity is restarted on all devices
-						serviceCallbacks.restartActivityWithDelay(true);
+						serviceCallbacks.restartActivity(true);
 					} else {
 						Log.e(className, ".run: restarting MainActivity impossible; serviceCallbacks is null");
 					}

@@ -12,8 +12,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActionBar;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
@@ -135,6 +133,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 //    }
 
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
+		AppRestarter.clearRestartPending();
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setDefaultUncaughtExceptionHandler");
@@ -242,56 +241,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		recreate();
 	}
 
+	// implement the IServiceCallbacks interface
 	// 'trick' to have a default value of false for force parameter
-	public void restartDelayed() { restartDelayed(false); }
-	// force=true can be used to make sure the restart is performed on all devices
-	// force=false makes restart device dependent; not performed on devices where
-	// it may lead to restart-loops
-	public void restartDelayed(boolean force) {
-		Log.i(className, ".restartDelayed, force: " + force);
-
-		if (getResources().getBoolean(R.bool.restart) || force) {
-			// the context of the activityIntent might need to be the running PlayrService
-			// keep the Intent in sync with the Manifest and DefaultExceptionHandler
-//			PendingIntent localPendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_ONE_SHOT);
-			Intent activityIntent = new Intent(MainActivity.this.getBaseContext(), biz.playr.MainActivity.class);
-			activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-					| Intent.FLAG_ACTIVITY_CLEAR_TASK
-					| Intent.FLAG_ACTIVITY_NEW_TASK);
-			activityIntent.setAction(Intent.ACTION_MAIN);
-			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-			// As of S/31 FLAG_IMMUTABLE/FLAG_MUTABLE is required
-			PendingIntent localPendingIntent = PendingIntent.getActivity(MainActivity.this.getBaseContext(), 0, activityIntent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
-			// delay start so this activity can be ended before the new one starts
-			// Following code will restart application after DefaultExceptionHandler.restartDelay milliseconds
-			AlarmManager mgr =  (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-			if (mgr != null) {
-				Log.i(className, ".restartDelayed: setting alarm manager to restart with a delay of " +  DefaultExceptionHandler.restartDelay/1000 + " seconds");
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					// possibly better alternative, see also using Handler for this
-					try {
-						mgr.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-						Log.i(className, ".restartDelayed: called setAndAllowWhileIdle");
-					} catch (SecurityException ex) {
-						Log.e(className, ".restartDelayed: setAndAllowWhileIdle caused security exception: " + ex);
-					}
-				} else {
-					try {
-						// as of Android 14 (API 34) calling setExact is no longer permitted
-						mgr.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + DefaultExceptionHandler.restartDelay, localPendingIntent);
-						Log.i(className, ".restartDelayed: called set");
-					} catch (SecurityException ex) {
-						Log.e(className, ".restartDelayed: set caused security exception: " + ex);
-						throw ex;
-					}
-				}
-			}
-		} else {
-			// Pro Display usage; no restart of the MainActivity
-			Log.i(className, ".restartDelayed MainActivity NOT restarted");
-		}
-		Log.i(className, ".restartDelayed: end");
+	public void restartActivity() { restartActivity(false); }
+	public void restartActivity(boolean force) {
+		Log.i(className, "restartActivity: immediate in-process restart");
+		AppRestarter.restartImmediateRecreate(this, force);
 	}
+
+	public String getPlayerId() {
+		return getStoredPlayerId();
+	}
+	// end of implementation IServiceCallbacks
 
 	// implement the ComponentCallbacks2 interface
 	/**
@@ -358,34 +319,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 	// end of implementation ComponentCallbacks2
-
-	// implement the IServiceCallbacks interface
-	public void restartActivityWithDelay() {
-		restartActivityWithDelay(false);
-	}
-	public void restartActivityWithDelay(boolean force) {
-		this.restartActivity(force);
-	}
-
-	public String getPlayerId() {
-		return getStoredPlayerId();
-	}
-	// end of implementation IServiceCallbacks
-
-	// 'trick' to have a default value of false for force parameter
-	public void restartActivity() { restartActivity(false); }
-	public void restartActivity(boolean force) {
-		Log.i(className, "restartActivity: setting up delayed restart");
-		restartDelayed(force);
-		Log.i(className, "restartActivity: killing this process");
-		setResult(RESULT_OK);
-		Log.i(className, "restartActivity: calling finish()");
-		finish();
-//		Log.i(className, "restartActivity: calling killProcess()");
-//		android.os.Process.killProcess(android.os.Process.myPid());
-//		Log.i(className, "restartActivity: calling exit(2)");
-//		System.exit(2);
-	}
 
 	@Override
 	protected void onSaveInstanceState(@NonNull Bundle outState) {
@@ -517,18 +450,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//
 
-		// TODO: properly handling the delayed restart can only be done by letting the system handle less onDestroy events:
-		// see: https://developer.android.com/guide/topics/resources/runtime-changes#java
-		// this would mean:
-		// 1) configure onDestroy not to be called when the screen is rotated
-		// 2) calling restartDelayed() here
-		// 3) handling the screen rotation in an overridden onConfigurationChanged implementation
-
-		// ! restart is turned off for now since the restarts can trigger a recurring restart
-		// ! the option to auto reboot a player when it is detected to not play should be
-		// ! sufficient to keep players active
-		Log.i(className,"onDestroy: possibly delayed restart of the application!");
-		restartDelayed();
+		// Delayed background restart when the OS or user closes the app. The delay avoids restart
+		// loops (for example on rotation) and gives users time to change settings or leave the app.
+		// Immediate restarts from the watchdog, crash handler, and memory recovery use AppRestarter
+		// directly and are deduplicated via the restart-pending guard.
+		Log.i(className, "onDestroy: scheduling delayed background restart if needed");
+		AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
 
 		Log.i(className, "onDestroy: stopMemoryChecking");
 		this.stopMemoryChecking();
@@ -987,16 +914,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Runtime runtime = Runtime.getRuntime();
 		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
 		result = calculateMemoryStatus(memoryInfo.availMem, memoryInfo.threshold);
-		Log.e(className, ".\n***************************************************************************************\n" +
+		Log.e(className, ".\n********************************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
 				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
 				"*** used memory: " + (memoryInfo.totalMem - memoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - memoryInfo.availMem)*100/memoryInfo.totalMem + "%] (initially: " + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)*100/memoryInfo.totalMem + "%])\n" +
 				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
-				"***************************************************************************************\n" +
-				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available and " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold => result: " + result  + "\n" +
-				"***************************************************************************************\n.");
+				"********************************************************************************\n" +
+				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold\n***  => result: " + result  + "\n" +
+				"********************************************************************************\n.");
 		return result;
 	}
 
