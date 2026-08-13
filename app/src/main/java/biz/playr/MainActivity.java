@@ -591,24 +591,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private void openBrowserView(boolean initialiseWebContent, boolean twaWasLaunched, String playerId) {
 		Log.i(className, "openBrowserView");
 //		setContentView(R.layout.activity_main);
-		// create Trusted Web Access or fall back to a WebView
-		String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
 		// fall back to WebView since TWA is currently (Chrome 83) not working well enough to replace TWA
 		// * URL bar stays visible
 		// * button bar stays visible
 		// * video's with sound do not play even though they do in Chrome (when playing the same channel)
-		if (false) {
+		// create Trusted Web Access or fall back to a WebView
+		// String chromePackage = CustomTabsClient.getPackageName(this, TrustedWebUtils.SUPPORTED_CHROME_PACKAGES, true);
+		// if (false) {
 //		if (chromePackage != null) {
-			Log.i(className, "openBrowserView chromePackage is not null");
-			if (!chromeVersionChecked) {
-				Log.i(className, "openBrowserView !chromeVersionChecked");
-				TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
-				chromeVersionChecked = true;
-			}
+			// Log.i(className, "openBrowserView chromePackage is not null");
+			// if (!chromeVersionChecked) {
+				// Log.i(className, "openBrowserView !chromeVersionChecked");
+				// TrustedWebUtils.promptForChromeUpdateIfNeeded(this, chromePackage);
+				// chromeVersionChecked = true;
+			// }
 
-			twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
+			// twaServiceConnection = openTWAView(twaWasLaunched, chromePackage);
 			// setContentView(?????);
-		} else {
+		// } else {
 			// fall back to WebView
 			if (webView != null) {
 				Log.e(className, "openBrowserView webView is not null");
@@ -619,7 +619,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				webView.setDefaultFocusHighlightEnabled(false);
 			}
 			setContentView(webView);
-		}
+		// }
 	}
 
 	private TwaCustomTabsServiceConnection openTWAView(boolean twaWasLaunched, String chromePackage) {

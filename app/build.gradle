@@ -2,7 +2,7 @@ apply plugin: 'com.android.application'
 
 def appManifest = [
         applicationId: "biz.playr",
-        name: 'Playr', // The name shown on the Android Launcher.
+        name: "\"${APP_NAME}\"" + "\"${APP_NAME_MODIFIER}\"", // The name shown on the Android Launcher.
         versionName: "3.0.4",
         //////////////////////////////////////////////////////////////////////////
         // new versionCode scheme is necessary since we might have to update the
@@ -55,7 +55,7 @@ allprojects {
 }
 
 android {
-    compileSdk = 36
+    compileSdk = 37
     namespace = 'biz.playr'
 
     defaultConfig {
@@ -70,6 +70,10 @@ android {
 
         // The name for the application on the Android Launcher
         resValue "string", "versionName", appManifest.versionName
+
+        // auto start and restart behaviour
+        resValue "bool", "auto_start", "${AUTO_START}"
+        resValue "bool", "restart", "${RESTART}"
 
         // The URL that will be used when launching the TWA from the Android Launcher
         def launchUrl = "http://" + twaManifest.hostName + twaManifest.launchUrl + "?app_version=" + appManifest.versionName
@@ -154,8 +158,6 @@ android {
             minifyEnabled true
             debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            resValue "bool", "auto_start", "true"
-            resValue "bool", "restart", "true"
         }
         releaseProDisplay {
             minifyEnabled true
@@ -172,9 +174,7 @@ android {
             renderscriptDebuggable true
             renderscriptOptimLevel = 3
             signingConfig = signingConfigs.debug
-            resValue "bool", "auto_start", "false"
-            resValue "bool", "restart", "false"
-            resValue "string", "appName", appManifest.name + "ForDebugDisplay"
+            resValue "string", "appName", appManifest.name + "Debug"
         }
     }
     compileOptions {
@@ -190,7 +190,8 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     // version 1.14.0 is the latest version that supports SDK version 21
     implementation 'androidx.webkit:webkit:1.14.0'
-//    implementation 'androidx.browser:browser:1.2.0'
+    // version 1.9.0 is the latest version that supports SDK version 21
+    implementation 'androidx.browser:browser:1.9.0'
     implementation 'androidx.preference:preference:1.2.1'
 //    implementation 'androidx.core:core:1.13.1'
 
