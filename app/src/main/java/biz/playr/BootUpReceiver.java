@@ -69,15 +69,8 @@ public class BootUpReceiver extends BroadcastReceiver{
 //				Log.i(className, ".onReceive: called context.startActivity()");
 //			}
 
-		if (context.getResources().getBoolean(R.bool.auto_start)) {
-			Intent activityIntent = new Intent(context, MainActivity.class);
-			activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
-					| Intent.FLAG_ACTIVITY_CLEAR_TASK
-					| Intent.FLAG_ACTIVITY_NEW_TASK);
-			activityIntent.setAction(Intent.ACTION_MAIN);
-			activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-			context.startActivity(activityIntent);
-			Log.i(className, ".onReceive MainActivity started");
+		if (AppRestarter.launchFromBoot(context)) {
+			Log.i(className, ".onReceive: boot launch requested");
 		} else {
 			// Pro Display usage; no auto start of the MainActivity
 			Log.i(className, ".onReceive MainActivity NOT started");

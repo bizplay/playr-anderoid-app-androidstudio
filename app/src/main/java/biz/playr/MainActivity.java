@@ -909,7 +909,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
 				"********************************************************************************\n" +
-				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold\n***  => result: " + result  + "\n" +
+				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold\n*** => result: " + result  + "\n" +
 				"********************************************************************************\n.");
 		return result;
 	}
@@ -975,9 +975,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 					if (pi != null &&
 							result.get("webviewVersion") != null &&
               !Objects.equals(result.get("webviewVersion"), "Version-name: " + pi2.versionName + ", -code: " + versionCode)) {
-						result.put("webviewVersion", result.get("webviewVersion") + "Version-name: " + pi2.versionName + ", -code: " + versionCode);
+						result.put("webviewVersion", result.get("webviewVersion") + " | Version-name: " + pi2.versionName + ", -code: " + versionCode);
 					} else {
-						result.put("webviewVersion", "Version-name: " + pi2.versionName + " -code: " + versionCode);
+						result.put("webviewVersion", "Version-name: " + pi2.versionName + ", -code: " + versionCode);
 					}
 				}
 			}

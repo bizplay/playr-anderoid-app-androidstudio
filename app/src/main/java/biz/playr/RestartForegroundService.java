@@ -17,8 +17,9 @@ import android.provider.Settings;
 import android.util.Log;
 
 /**
- * Keeps the process elevated for a short delay after {@link MainActivity} is closed, then
- * relaunches it. Used on Android 10+ where AlarmManager activity starts are blocked (BAL).
+ * Launches {@link MainActivity} from a foreground service. Used after boot and after the
+ * activity is closed, where a direct {@code startActivity()} from a receiver or AlarmManager
+ * is blocked (BAL). {@code BOOT_COMPLETED} may start this service; it may not start an activity.
  */
 public class RestartForegroundService extends Service {
 	private static final String className = "biz.playr.RestartFgService";
@@ -54,7 +55,7 @@ public class RestartForegroundService extends Service {
 			startForeground(
 					NOTIFICATION_ID,
 					notification,
-					ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
+					ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
 		} else {
 			startForeground(NOTIFICATION_ID, notification);
 		}

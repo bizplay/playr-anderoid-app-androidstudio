@@ -48,6 +48,27 @@ final class AppRestarter {
 	}
 
 	/**
+	 * Launch {@link MainActivity} after boot. {@code BOOT_COMPLETED} may start a foreground
+	 * service, but starting an activity directly from the receiver is a BAL-blocked background
+	 * start on Android 10+. {@link Application#onCreate()} is not an exemption either: the
+	 * process is created only to deliver the broadcast.
+	 */
+	static boolean launchFromBoot(Context context) {
+		if (!context.getResources().getBoolean(R.bool.auto_start)) {
+			Log.i(className, ".launchFromBoot: auto_start disabled");
+			return false;
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity");
+			RestartForegroundService.scheduleRestart(context, 0);
+			return true;
+		}
+		Log.i(className, ".launchFromBoot: starting MainActivity directly (pre-Q)");
+		context.startActivity(createRestartActivityIntent(context));
+		return true;
+	}
+
+	/**
 	 * Restarts in-process via {@link Activity#recreate()} while the activity is still alive.
 	 * Used by the watchdog and low-memory recovery paths.
 	 */

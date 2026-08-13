@@ -49,7 +49,7 @@
 	<!-- WAKE_LOCK is used by the media player inside WebView/Chromium -->
 	<uses-permission android:name="android.permission.WAKE_LOCK"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"/>
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 	<!-- Overlay is an optional BAL exemption if an operator grants it in Settings. -->
 	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
@@ -130,7 +130,11 @@
 			android:name="biz.playr.RestartForegroundService"
 			android:exported="false"
 			android:enabled="true"
-			android:foregroundServiceType="shortService"/>
+			android:foregroundServiceType="specialUse">
+			<property
+				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+				android:value="Relaunch Playr after boot or after the player UI is closed on unattended displays"/>
+		</service>
 		<!--
 		<service
 			android:name="biz.playr.CheckRestartService"
