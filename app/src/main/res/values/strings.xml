@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Playr</string>
+    <string name="app_name_modifier"></string>
     <string name="action_settings">Settings</string>
     <string name="hello_world">Hello world!</string>
     <string name="loading_video">Loading video</string>
@@ -13,4 +14,8 @@
     <string name="playr_urls">www.playr.biz|play.playr.biz|playr.biz</string>
     <string name="player_id_cookie_name">playback_device_id</string>
     <string name="watchdog_name">Playr Watchdog</string>
+    <string name="restart_notification_channel_name">Playr restart</string>
+    <string name="restart_notification_channel_description">Keeps Playr running briefly so it can restart after being closed.</string>
+    <string name="restart_notification_title">Restarting Playr</string>
+    <string name="restart_notification_text">Playr will reopen shortly.</string>
 </resources>

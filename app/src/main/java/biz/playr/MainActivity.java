@@ -2,6 +2,7 @@ package biz.playr;
 
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.UUID;
 
 import static android.view.WindowInsets.Type.navigationBars;
@@ -28,7 +29,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.os.StrictMode;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
@@ -50,7 +50,6 @@ import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -76,7 +75,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	// TWA related
-	private boolean chromeVersionChecked = false;
+	// private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
 	private Bundle currentSavedInstanceState;
 	private static final int SESSION_ID = 96375;
@@ -412,15 +411,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onStop() {
 		Log.i(className, "override onStop");
 		this.unBindServiceConnection();
-		// The application is pushed into the background
-		// This method is also called when the device is turned (portrait/landscape
-		// switch) and will result in repeated restart of the app
-		// detecting rotation to prevent unnecessary calls to restartDelayed is
-		// supposed to be complex and may require logic that spans onStop and onCreate
-		// since these are called by the Android system when the screen is rotated
-		// see: https://stackoverflow.com/questions/6896243/how-can-i-detect-screen-rotation
-		// and: https://stackoverflow.com/questions/4843809/how-do-i-detect-screen-rotation
-		// restartDelayed();
+		// Start the delayed restart while we are still more likely to be allowed to start a
+		// foreground service. Skip configuration changes (rotation) so those do not restart-loop.
+		if (isFinishing() && !isChangingConfigurations()) {
+			Log.i(className, "onStop: activity is finishing, scheduling delayed restart");
+			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
+		}
 		super.onStop();
 		Log.i(className, "onStop: end");
 	}
@@ -450,12 +446,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//
 
-		// Delayed background restart when the OS or user closes the app. The delay avoids restart
-		// loops (for example on rotation) and gives users time to change settings or leave the app.
-		// Immediate restarts from the watchdog, crash handler, and memory recovery use AppRestarter
-		// directly and are deduplicated via the restart-pending guard.
-		Log.i(className, "onDestroy: scheduling delayed background restart if needed");
-		AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
+		// Fallback if onStop did not already schedule (guarded against double-schedule).
+		// Skip configuration changes so rotation does not restart-loop.
+		if (!isChangingConfigurations()) {
+			Log.i(className, "onDestroy: scheduling delayed background restart if needed");
+			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
+		} else {
+			Log.i(className, "onDestroy: configuration change, not scheduling delayed restart");
+		}
 
 		Log.i(className, "onDestroy: stopMemoryChecking");
 		this.stopMemoryChecking();
@@ -715,23 +713,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void requestManageOverlayPermission(Context context) {
-		// currently (players using Android 11 and 12 in production) it
-		// seems not necessary to request the overlay permission
-		// in order to have the auto-start work based on "catching" the
-		// 'boot completed' action in the BootUpReceiver
-		if (false) {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isAndroidTV()) {
-				if (!Settings.canDrawOverlays(context)) {
-					Log.i(className, "requestManageOverlayPermission: requesting overlay permission");
-					Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-							Uri.parse("package:" + getPackageName()));
-					startActivityForResult(intent, REQUEST_OVERLAY_PERMISSION);
-				}
-//      	    // old way
-//				if (!Settings.canDrawOverlays(getApplicationContext())) {
-//					startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
-//				}
-			}
+		// Overlay permission is a BAL exemption and a fallback for delayed restart on Android 10+.
+		// Do not open the system Settings screen automatically: dedicated players often have no
+		// usable input, and boot auto-start already works via BootUpReceiver.
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+			Log.i(className, "requestManageOverlayPermission: overlay granted="
+					+ Settings.canDrawOverlays(context));
 		}
 	}
 
@@ -979,14 +966,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			pi = pm.getPackageInfo("com.google.android.webview", 0);
 			if (pi != null) {
 				versionCode = PackageInfoCompat.getLongVersionCode(pi);
-				result.put("webviewVersion", "Version-name: " + pi.versionName + " -code: " + versionCode);
+				result.put("webviewVersion", "Version-name: " + pi.versionName + ", -code: " + versionCode);
 			}
 			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 				pi2 = WebViewCompat.getCurrentWebViewPackage(MainActivity.this);
 				if (pi2 != null) {
 					versionCode = PackageInfoCompat.getLongVersionCode(pi2);
-					if (pi != null) {
-						result.put("webviewVersion", result.get("webviewVersion") + "Version-name: " + pi2.versionName + " -code: " + versionCode);
+					if (pi != null &&
+							result.get("webviewVersion") != null &&
+              !Objects.equals(result.get("webviewVersion"), "Version-name: " + pi2.versionName + ", -code: " + versionCode)) {
+						result.put("webviewVersion", result.get("webviewVersion") + "Version-name: " + pi2.versionName + ", -code: " + versionCode);
 					} else {
 						result.put("webviewVersion", "Version-name: " + pi2.versionName + " -code: " + versionCode);
 					}

@@ -1,0 +1,185 @@
+package biz.playr;
+
+import android.app.ActivityOptions;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.provider.Settings;
+import android.util.Log;
+
+/**
+ * Keeps the process elevated for a short delay after {@link MainActivity} is closed, then
+ * relaunches it. Used on Android 10+ where AlarmManager activity starts are blocked (BAL).
+ */
+public class RestartForegroundService extends Service {
+	private static final String className = "biz.playr.RestartFgService";
+	private static final String EXTRA_DELAY_MS = "delay_ms";
+	private static final int NOTIFICATION_ID = 1001;
+	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
+	private static final String NOTIFICATION_CHANNEL_ID = "playr_restart";
+
+	private final Handler handler = new Handler(Looper.getMainLooper());
+	private Runnable restartTask;
+
+	static void scheduleRestart(Context context, long delayMs) {
+		Intent intent = new Intent(context, RestartForegroundService.class);
+		intent.putExtra(EXTRA_DELAY_MS, delayMs);
+		Context appContext = context.getApplicationContext();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			appContext.startForegroundService(intent);
+		} else {
+			appContext.startService(intent);
+		}
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		long delayMs = AppRestarter.RESTART_DELAY_MS;
+		if (intent != null) {
+			delayMs = intent.getLongExtra(EXTRA_DELAY_MS, AppRestarter.RESTART_DELAY_MS);
+		}
+
+		createNotificationChannel();
+		Notification notification = buildNotification();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+			startForeground(
+					NOTIFICATION_ID,
+					notification,
+					ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
+		} else {
+			startForeground(NOTIFICATION_ID, notification);
+		}
+
+		if (restartTask != null) {
+			handler.removeCallbacks(restartTask);
+		}
+		restartTask = this::relaunchMainActivity;
+		handler.postDelayed(restartTask, delayMs);
+		Log.i(className, ".onStartCommand: relaunch in " + delayMs + " ms");
+		return START_NOT_STICKY;
+	}
+
+	@Override
+	public void onDestroy() {
+		if (restartTask != null) {
+			handler.removeCallbacks(restartTask);
+			restartTask = null;
+		}
+		super.onDestroy();
+	}
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		return null;
+	}
+
+	private void relaunchMainActivity() {
+		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
+		boolean launched = startActivityWithBalOptIn(activityIntent);
+		if (!launched) {
+			launched = sendRestartPendingIntent(activityIntent);
+		}
+		if (!launched) {
+			Log.e(className, ".relaunchMainActivity: could not relaunch MainActivity");
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			stopForeground(STOP_FOREGROUND_REMOVE);
+		} else {
+			stopForeground(true);
+		}
+		stopSelf();
+	}
+
+	private boolean startActivityWithBalOptIn(Intent activityIntent) {
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+					&& Settings.canDrawOverlays(this)) {
+				Log.i(className, ".startActivityWithBalOptIn: overlay permission granted");
+			}
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+				startActivity(activityIntent, createBackgroundStartOptions().toBundle());
+			} else {
+				startActivity(activityIntent);
+			}
+			Log.i(className, ".startActivityWithBalOptIn: startActivity issued");
+			return true;
+		} catch (RuntimeException ex) {
+			Log.e(className, ".startActivityWithBalOptIn: startActivity failed", ex);
+			return false;
+		}
+	}
+
+	private boolean sendRestartPendingIntent(Intent activityIntent) {
+		PendingIntent launchPendingIntent = PendingIntent.getActivity(
+				this,
+				RESTART_PENDING_INTENT_REQUEST_CODE,
+				activityIntent,
+				PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+				launchPendingIntent.send(this, 0, null, null, null, null,
+						createBackgroundStartOptions().toBundle());
+			} else {
+				launchPendingIntent.send();
+			}
+			Log.i(className, ".sendRestartPendingIntent: PendingIntent sent");
+			return true;
+		} catch (PendingIntent.CanceledException | RuntimeException ex) {
+			Log.e(className, ".sendRestartPendingIntent: send failed", ex);
+			return false;
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private ActivityOptions createBackgroundStartOptions() {
+		ActivityOptions options = ActivityOptions.makeBasic();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+			options.setPendingIntentBackgroundActivityStartMode(
+					ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
+		} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+			options.setPendingIntentBackgroundActivityStartMode(
+					ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+		}
+		return options;
+	}
+
+	private void createNotificationChannel() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+			return;
+		}
+		NotificationChannel channel = new NotificationChannel(
+				NOTIFICATION_CHANNEL_ID,
+				getString(R.string.restart_notification_channel_name),
+				NotificationManager.IMPORTANCE_LOW);
+		channel.setDescription(getString(R.string.restart_notification_channel_description));
+		NotificationManager notificationManager =
+				(NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+		if (notificationManager != null) {
+			notificationManager.createNotificationChannel(channel);
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private Notification buildNotification() {
+		Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+				? new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+				: new Notification.Builder(this);
+		builder.setContentTitle(getString(R.string.restart_notification_title))
+				.setContentText(getString(R.string.restart_notification_text))
+				.setSmallIcon(R.drawable.ic_launcher)
+				.setOngoing(true);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
+		}
+		return builder.build();
+	}
+}

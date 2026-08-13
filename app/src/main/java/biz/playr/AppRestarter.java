@@ -12,16 +12,17 @@ import android.util.Log;
 /**
  * Coordinates application restarts. Use {@link #restartImmediateRecreate(Activity, boolean)} or
  * {@link #restartImmediateRelaunch(Context, boolean)} while the app is still in the foreground.
- * Use {@link #scheduleDelayedBackgroundRestart(Context, boolean)} from {@code onDestroy} when the
- * app may already be in the background.
+ * Use {@link #scheduleDelayedBackgroundRestart(Context, boolean)} from {@code onStop}/{@code onDestroy}
+ * when the app is being closed.
  */
 final class AppRestarter {
 	private static final String className = "biz.playr.AppRestarter";
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
 
-	// Delay used only for background recovery (onDestroy). Kept long so users can change settings
-	// or switch apps without an immediate restart loop.
-	static final long RESTART_DELAY_MS = 30000;
+	// Short delay so onDestroy can finish tearing down the WebView, while the foreground service
+	// still has launch privileges. The historical 30s wait was for Android 3/4 resource cleanup
+	// and is no longer needed.
+	static final long RESTART_DELAY_MS = 2000;
 
 	private static volatile boolean restartPending = false;
 
@@ -91,8 +92,9 @@ final class AppRestarter {
 	}
 
 	/**
-	 * Schedules a delayed restart for when the activity is already being destroyed and may no
-	 * longer have a visible window. Intended for {@code onDestroy} only.
+	 * Schedules a delayed restart for when the activity is being closed. On Android 10+ this uses
+	 * a short-lived foreground service so the relaunch is not treated as a blocked background
+	 * activity start. Pre-Q keeps AlarmManager, which was not subject to BAL.
 	 */
 	static boolean scheduleDelayedBackgroundRestart(Context context, boolean force) {
 		if (!shouldRestart(context, force)) {
@@ -104,6 +106,23 @@ final class AppRestarter {
 			return false;
 		}
 
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			try {
+				Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
+						+ RESTART_DELAY_MS + " ms");
+				RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS);
+				return true;
+			} catch (RuntimeException ex) {
+				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service", ex);
+				clearRestartPending();
+				return false;
+			}
+		}
+
+		return scheduleAlarmRestart(context);
+	}
+
+	private static boolean scheduleAlarmRestart(Context context) {
 		PendingIntent launchPendingIntent = PendingIntent.getActivity(
 				context.getApplicationContext(),
 				RESTART_PENDING_INTENT_REQUEST_CODE,
@@ -112,21 +131,17 @@ final class AppRestarter {
 
 		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 		if (alarmManager == null) {
-			Log.e(className, ".scheduleDelayedBackgroundRestart: AlarmManager unavailable");
+			Log.e(className, ".scheduleAlarmRestart: AlarmManager unavailable");
 			clearRestartPending();
 			return false;
 		}
 
 		long triggerAt = System.currentTimeMillis() + RESTART_DELAY_MS;
-		Log.i(className, ".scheduleDelayedBackgroundRestart: alarm in " + (RESTART_DELAY_MS / 1000) + " seconds");
+		Log.i(className, ".scheduleAlarmRestart: alarm in " + RESTART_DELAY_MS + " ms");
 		try {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, launchPendingIntent);
-			} else {
-				alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, launchPendingIntent);
-			}
+			alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, launchPendingIntent);
 		} catch (SecurityException ex) {
-			Log.e(className, ".scheduleDelayedBackgroundRestart: alarm scheduling failed", ex);
+			Log.e(className, ".scheduleAlarmRestart: alarm scheduling failed", ex);
 			clearRestartPending();
 			return false;
 		}
