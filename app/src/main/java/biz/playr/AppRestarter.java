@@ -2,6 +2,7 @@ package biz.playr;
 
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -45,6 +46,21 @@ final class AppRestarter {
 		activityIntent.setAction(Intent.ACTION_MAIN);
 		activityIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 		return activityIntent;
+	}
+
+	/**
+	 * Android 14+ gate for {@link android.app.Notification.Builder#setFullScreenIntent}.
+	 * The manifest permission is not enough; the user/OEM can still deny this in settings.
+	 */
+	static String fullScreenIntentStatus(Context context) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+			return "not required (API < 34)";
+		}
+		NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+		if (notificationManager == null) {
+			return "unknown";
+		}
+		return notificationManager.canUseFullScreenIntent() ? "granted" : "denied";
 	}
 
 	/**

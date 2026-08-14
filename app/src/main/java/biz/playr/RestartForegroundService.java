@@ -140,7 +140,8 @@ public class RestartForegroundService extends Service {
 		try {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 				Log.i(className, ".startActivityWithBalOptIn: overlay granted="
-						+ Settings.canDrawOverlays(this));
+						+ Settings.canDrawOverlays(this)
+						+ ", fullScreenIntent=" + AppRestarter.fullScreenIntentStatus(this));
 			}
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 				startActivity(activityIntent, createBackgroundStartOptions().toBundle());

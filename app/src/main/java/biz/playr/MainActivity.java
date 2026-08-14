@@ -578,6 +578,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***         auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 53) + "***");
 		Log.e(className, "***            restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 53) + "***");
+		Log.e(className, "***  full-screen intent: " + paddedOut(AppRestarter.fullScreenIntentStatus(this), 52) + "***");
 		Log.e(className, "***           app name: " + paddedOut(getString(R.string.appName), 53) + "***");
 		Log.e(className, "***       version name: " + paddedOut(getString(R.string.versionName), 53) + "***");
 		Log.e(className, "***           hostname: " + paddedOut(getString(R.string.hostName), 53) + "***");
