@@ -178,6 +178,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
         // period of inactivity.
         // Also important for other types of Android versions
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+			setShowWhenLocked(true);
+			setTurnScreenOn(true);
+		}
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
 			getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		}

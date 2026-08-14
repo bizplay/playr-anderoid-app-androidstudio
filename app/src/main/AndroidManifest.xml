@@ -51,6 +51,8 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+	<!-- Full-screen intent is how a specialUse FGS can start MainActivity when BAL blocks startActivity. -->
+	<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 	<!-- Overlay is an optional BAL exemption if an operator grants it in Settings. -->
 	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 	<!--  Non exact scheduled alarms are sufficient -->
@@ -98,6 +100,8 @@
 			android:label="@string/app_name"
 			android:launchMode = "singleInstance"
 			android:keepScreenOn="true"
+			android:showWhenLocked="true"
+			android:turnScreenOn="true"
 			android:exported="true" >
 			<!-- for TWA -->
 			<!--<intent-filter android:autoVerify="true">-->
