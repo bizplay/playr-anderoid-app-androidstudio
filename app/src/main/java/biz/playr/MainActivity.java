@@ -562,29 +562,30 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                            System information                            ***");
 		Log.e(className, "***                            ==================                            ***");
 		Log.e(className, "***                                                                          ***");
-		Log.e(className, "***  Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 53) + "***");
-		Log.e(className, "*** Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 53) + "***");
-		Log.e(className, "***       manufacturer: " + paddedOut(Build.MANUFACTURER, 53) + "***");
-		Log.e(className, "***              brand: " + paddedOut(Build.BRAND, 53) + "***");
-		Log.e(className, "***            product: " + paddedOut(Build.PRODUCT, 53) + "***");
-		Log.e(className, "***              model: " + paddedOut(Build.MODEL, 53) + "***");
-		Log.e(className, "***           hardware: " + paddedOut(Build.HARDWARE, 53) + "***");
-		Log.e(className, "***             device: " + paddedOut(Build.DEVICE, 53) + "***");
-		Log.e(className, "***              board: " + paddedOut(Build.BOARD, 53) + "***");
+		Log.e(className, "***   Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 52) + "***");
+		Log.e(className, "***  Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 52) + "***");
+		Log.e(className, "***        manufacturer: " + paddedOut(Build.MANUFACTURER, 52) + "***");
+		Log.e(className, "***               brand: " + paddedOut(Build.BRAND, 52) + "***");
+		Log.e(className, "***             product: " + paddedOut(Build.PRODUCT, 52) + "***");
+		Log.e(className, "***               model: " + paddedOut(Build.MODEL, 52) + "***");
+		Log.e(className, "***            hardware: " + paddedOut(Build.HARDWARE, 52) + "***");
+		Log.e(className, "***              device: " + paddedOut(Build.DEVICE, 52) + "***");
+		Log.e(className, "***               board: " + paddedOut(Build.BOARD, 52) + "***");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Log.e(className, "***   soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 53) + "***");
-			Log.e(className, "***          soc model: " + paddedOut(Build.SOC_MODEL, 53) + "***");
+            Log.e(className, "***    soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 52) + "***");
+			Log.e(className, "***           soc model: " + paddedOut(Build.SOC_MODEL, 52) + "***");
         }
 		Log.e(className, "***                                                                          ***");
-		Log.e(className, "***         auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 53) + "***");
-		Log.e(className, "***            restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 53) + "***");
+		Log.e(className, "***          auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 52) + "***");
+		Log.e(className, "***             restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 52) + "***");
 		Log.e(className, "***  full-screen intent: " + paddedOut(AppRestarter.fullScreenIntentStatus(this), 52) + "***");
-		Log.e(className, "***           app name: " + paddedOut(getString(R.string.appName), 53) + "***");
-		Log.e(className, "***       version name: " + paddedOut(getString(R.string.versionName), 53) + "***");
-		Log.e(className, "***           hostname: " + paddedOut(getString(R.string.hostName), 53) + "***");
 		Log.e(className, "***                                                                          ***");
-		Log.e(className, "***        app version: " + paddedOut(versionInfo.get("appVersion"), 53) + "***");
-		Log.e(className, "***    webview version: " + paddedOut(versionInfo.get("webviewVersion"), 53) + "***");
+		Log.e(className, "***            app name: " + paddedOut(getString(R.string.appName), 52) + "***");
+		Log.e(className, "***        version name: " + paddedOut(getString(R.string.versionName), 52) + "***");
+		Log.e(className, "***            hostname: " + paddedOut(getString(R.string.hostName), 52) + "***");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "***         app version: " + paddedOut(versionInfo.get("appVersion"), 52) + "***");
+		Log.e(className, "***     webview version: " + paddedOut(versionInfo.get("webviewVersion"), 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "********************************************************************************");
 	}
