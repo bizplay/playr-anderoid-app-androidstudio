@@ -48,18 +48,31 @@ final class AppRestarter {
 	}
 
 	/**
-	 * Launch {@link MainActivity} after boot. {@code BOOT_COMPLETED} may start a foreground
-	 * service, but starting an activity directly from the receiver is a BAL-blocked background
-	 * start on Android 10+. {@link Application#onCreate()} is not an exemption either: the
-	 * process is created only to deliver the broadcast.
+	 * Launch {@link MainActivity} after {@code BOOT_COMPLETED}. Starting an activity directly
+	 * from the receiver is BAL-blocked on Android 10+; a short-lived foreground service is
+	 * allowed during this broadcast. {@link android.app.Application#onCreate()} is not an
+	 * exemption: Android 14 rejects {@code startForegroundService()} there while the process
+	 * is still cached.
+	 * <p>
+	 * {@code R.bool.auto_start} is ignored on Android 14+. Leaving standby on these TVs is
+	 * delivered as boot, and this receiver is the only legal way for the app to start itself.
+	 * Below API 34 the flag is still honoured (debug / Pro Display can leave start to the
+	 * firmware or the user). Skip if {@code MainActivity} is already visible.
 	 */
 	static boolean launchFromBoot(Context context) {
-		if (!context.getResources().getBoolean(R.bool.auto_start)) {
+		if (MainActivity.isInstanceAlive()) {
+			Log.i(className, ".launchFromBoot: MainActivity already running, skip");
+			return false;
+		}
+		boolean autoStart = context.getResources().getBoolean(R.bool.auto_start);
+		boolean ignoreAutoStart = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
+		if (!autoStart && !ignoreAutoStart) {
 			Log.i(className, ".launchFromBoot: auto_start disabled");
 			return false;
 		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity");
+			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity"
+					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart + ")");
 			if (!RestartForegroundService.scheduleRestart(context, 0)) {
 				Log.e(className, ".launchFromBoot: foreground service start was rejected");
 				return false;

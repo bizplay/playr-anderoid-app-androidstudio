@@ -72,8 +72,7 @@ public class BootUpReceiver extends BroadcastReceiver{
 		if (AppRestarter.launchFromBoot(context)) {
 			Log.i(className, ".onReceive: boot launch requested");
 		} else {
-			// Pro Display usage; no auto start of the MainActivity
-			Log.i(className, ".onReceive MainActivity NOT started");
+			Log.i(className, ".onReceive: MainActivity not started from boot receiver");
 		}
 // }
 		Log.i(className, ".onReceive: end");
