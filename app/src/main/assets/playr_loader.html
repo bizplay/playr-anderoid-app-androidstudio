@@ -28,41 +28,26 @@
       "use strict";
       console.error("loadPlayer start");
       displayInformation();
-      // Append Date param to ensure cache bypass
+      // Append Date param to ensure cache bypass.
+      // Use an Image instead of XMLHttpRequest: Chrome WebView on Android 11+ treats
+      // file:// (and unique opaque origins) as cross-origin, so XHR to playr.biz is
+      // CORS-blocked and never reaches readyState 4 / status 200. Loading an <img>
+      // does not require CORS headers on the PNG.
       var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
       try {
-        var request = httpRequest();
-        if (request === undefined || request === null) { showStatus("Error", "No http-request could be created", "error"); }
-
-        request.onreadystatechange = function () {
-          if (request.readyState === 4) {
-            if (request.status === 200) {
-              showStatus("Starting playback", "loading content...", "info");
-              console.error("onreadystatechange gotoPlayer()");
-              gotoPlayer();
-            } else {
-              showStatus("Error", "code=" + request.status.toString(), "error");
-              console.error("onreadystatechange retryLoading()");
-              retryLoading();
-            }
-          } else {
-            showStatus("Loading", "status=" + request.readyState.toString(), "info");
-            console.error("onreadystatechange request.readyState !== 4");
-          }
-        }
-
-        // make sure there is enough time to read the parameters
-        setTimeout(function () {
-          try {
-            console.error("loadPlayer request.open()");
-            request.open("GET", url, true); // true to make the call async
-            request.send();
-          } catch (exception) {
-            console.error("loadPlayer request.open exception => retryLoading(): " + exception.message);
-            showStatus(exception.name, exception.message, "error");
-            retryLoading();
-          }
-        },5000);
+        var img = new Image();
+        img.onload = function () {
+          showStatus("Starting playback", "loading content...", "info");
+          console.error("loadPlayer image onload gotoPlayer()");
+          gotoPlayer();
+        };
+        img.onerror = function () {
+          showStatus("Error", "test image not reachable", "error");
+          console.error("loadPlayer image onerror retryLoading()");
+          retryLoading();
+        };
+        console.error("loadPlayer image.src " + url);
+        img.src = url;
       } catch (exception) {
         console.error("loadPlayer exception => retryLoading(): " + exception.message);
         showStatus(exception.name, exception.message, "error");
@@ -172,16 +157,6 @@
       }
       return result;
     }();
-
-    // Old compatibility code
-    function httpRequest() {
-      "use strict";
-      if (window.XMLHttpRequest) { // Mozilla, Safari, IE7+ ...
-        return new XMLHttpRequest();
-      } else if (window.ActiveXObject) { // IE 6 and older
-        return new ActiveXObject("Microsoft.XMLHTTP");
-      }
-    };
 
     function showStatus(name, message, level) {
       if (level !== undefined && level === "error") {

@@ -60,7 +60,10 @@ final class AppRestarter {
 		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity");
-			RestartForegroundService.scheduleRestart(context, 0);
+			if (!RestartForegroundService.scheduleRestart(context, 0)) {
+				Log.e(className, ".launchFromBoot: foreground service start was rejected");
+				return false;
+			}
 			return true;
 		}
 		Log.i(className, ".launchFromBoot: starting MainActivity directly (pre-Q)");
@@ -128,16 +131,14 @@ final class AppRestarter {
 		}
 
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			try {
-				Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
-						+ RESTART_DELAY_MS + " ms");
-				RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS);
-				return true;
-			} catch (RuntimeException ex) {
-				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service", ex);
+			Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
+					+ RESTART_DELAY_MS + " ms");
+			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
+				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service");
 				clearRestartPending();
 				return false;
 			}
+			return true;
 		}
 
 		return scheduleAlarmRestart(context);

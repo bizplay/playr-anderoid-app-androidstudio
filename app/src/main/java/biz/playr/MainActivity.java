@@ -1,5 +1,6 @@
 package biz.playr;
 
+import java.lang.ref.WeakReference;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Objects;
@@ -81,9 +82,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
-	// Because WebSetting allowFileAccessFromFileURLs is Deprecated
-	// https://stackoverflow.com/a/63707709
-	// and https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
+	// Load packaged HTML via a real https origin. file:// + XHR to the internet is
+	// blocked on Android 11+ (allowUniversalAccessFromFileURLs is ignored when targeting API 30+).
+	// https://developer.android.com/reference/androidx/webkit/WebViewAssetLoader
+	private static final String LOCAL_ASSET_BASE = "https://appassets.androidplatform.net/assets/";
+	private static volatile WeakReference<MainActivity> currentInstance;
 	private final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
 																		.addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
 																		.addPathHandler("/res/", new WebViewAssetLoader.ResourcesPathHandler(this))
@@ -92,11 +95,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Nullable
 	private MainActivity.TwaCustomTabsServiceConnection twaServiceConnection;
 
+	static boolean isInstanceAlive() {
+		MainActivity activity = currentInstance == null ? null : currentInstance.get();
+		if (activity == null || activity.isFinishing()) {
+			return false;
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) {
+			return false;
+		}
+		return true;
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		Log.i(className, "override onCreate");
 		currentSavedInstanceState = savedInstanceState;
 		super.onCreate(savedInstanceState);
+		currentInstance = new WeakReference<>(this);
 //		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 			// Use Strict Mode in order to detect problems with the use of Intents
 // detect all types of errors in usage of threads, log them and kill the app
@@ -424,6 +439,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Override
 	protected void onDestroy() {
 		Log.i(className, "override onDestroy");
+		if (currentInstance != null && currentInstance.get() == this) {
+			currentInstance = null;
+		}
 
 		// since onDestroy is called when the device changes aspect ratio
 		// (which is possible on tablets) this method cannot be used to force
@@ -680,8 +698,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			CookieManager.setAcceptFileSchemeCookies(true);
 		}
 		if (initialiseWebContent) {
-			result.loadDataWithBaseURL("file:///android_asset/",
-					initialHtmlPage(playerId, result.getSettings().getUserAgentString()), "text/html", "UTF-8", null);
+			String loaderUrl = LOCAL_ASSET_BASE + pageUrl(playerId, result.getSettings().getUserAgentString());
+			Log.i(className, "openWebView: loadUrl " + loaderUrl);
+			result.loadUrl(loaderUrl);
 		}
 
 		// Callbacks for service binding, passed to bindService()
@@ -879,11 +898,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				super.onReceivedHttpError(view, request, errorResponse);
 			}
 		};
-	};
-
-	private String initialHtmlPage(String playerId, String webviewUserAgent) {
-		return "<html><head><script type=\"text/javascript\" charset=\"utf-8\">window.location = \""
-				+ pageUrl(playerId, webviewUserAgent) + "\"</script><head><body/></html>";
 	};
 
 	// We use the ActivityManager.MemoryInfo.threshold: The threshold of availMem at which we consider

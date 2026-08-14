@@ -175,7 +175,7 @@ android {
             renderscriptOptimLevel = 3
             signingConfig = signingConfigs.debug
             resValue "string", "appName", appManifest.name + "Debug"
-            resValue "bool", "auto_start", "true"
+            resValue "bool", "auto_start", "false"
             resValue "bool", "restart", "false"
         }
     }

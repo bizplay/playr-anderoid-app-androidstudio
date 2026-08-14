@@ -31,14 +31,22 @@ public class RestartForegroundService extends Service {
 	private final Handler handler = new Handler(Looper.getMainLooper());
 	private Runnable restartTask;
 
-	static void scheduleRestart(Context context, long delayMs) {
+	static boolean scheduleRestart(Context context, long delayMs) {
 		Intent intent = new Intent(context, RestartForegroundService.class);
 		intent.putExtra(EXTRA_DELAY_MS, delayMs);
 		Context appContext = context.getApplicationContext();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-			appContext.startForegroundService(intent);
-		} else {
-			appContext.startService(intent);
+		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				appContext.startForegroundService(intent);
+			} else {
+				appContext.startService(intent);
+			}
+			return true;
+		} catch (RuntimeException ex) {
+			// Android 12+ throws ForegroundServiceStartNotAllowedException when the
+			// process is not in an allowed state (cached after standby, background, etc.).
+			Log.e(className, ".scheduleRestart: startForegroundService not allowed", ex);
+			return false;
 		}
 	}
 
@@ -84,6 +92,16 @@ public class RestartForegroundService extends Service {
 	}
 
 	private void relaunchMainActivity() {
+		if (MainActivity.isInstanceAlive()) {
+			Log.i(className, ".relaunchMainActivity: MainActivity already running, skip CLEAR_TASK relaunch");
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+				stopForeground(STOP_FOREGROUND_REMOVE);
+			} else {
+				stopForeground(true);
+			}
+			stopSelf();
+			return;
+		}
 		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
 		boolean launched = startActivityWithBalOptIn(activityIntent);
 		if (!launched) {
