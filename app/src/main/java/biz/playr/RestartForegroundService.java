@@ -29,7 +29,7 @@ public class RestartForegroundService extends Service {
 	private static final String EXTRA_DELAY_MS = "delay_ms";
 	private static final int NOTIFICATION_ID = 1001;
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
-	private static final String NOTIFICATION_CHANNEL_ID = "playr_launch";
+	static final String NOTIFICATION_CHANNEL_ID = "playr_launch";
 	private static final long STOP_AFTER_LAUNCH_MS = 4000;
 
 	private final Handler handler = new Handler(Looper.getMainLooper());

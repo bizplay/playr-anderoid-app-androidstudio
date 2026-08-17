@@ -14,6 +14,8 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActionBar;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
@@ -22,14 +24,19 @@ import android.content.res.Configuration;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.util.Log;
@@ -563,6 +570,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                            ==================                            ***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***   Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 52) + "***");
+		Log.e(className, "***         target SDK: " + paddedOut(String.valueOf(getApplicationInfo().targetSdkVersion), 52) + "***");
 		Log.e(className, "***  Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 52) + "***");
 		Log.e(className, "***        manufacturer: " + paddedOut(Build.MANUFACTURER, 52) + "***");
 		Log.e(className, "***               brand: " + paddedOut(Build.BRAND, 52) + "***");
@@ -575,15 +583,30 @@ public class MainActivity extends Activity implements IServiceCallbacks {
             Log.e(className, "***    soc manufacturer: " + paddedOut(Build.SOC_MANUFACTURER, 52) + "***");
 			Log.e(className, "***           soc model: " + paddedOut(Build.SOC_MODEL, 52) + "***");
         }
+		Log.e(className, "***             UI mode: " + paddedOut(uiModeStatus(), 52) + "***");
+		Log.e(className, "***          debuggable: " + paddedOut(String.valueOf(
+				(getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0), 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***          auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 52) + "***");
 		Log.e(className, "***             restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 52) + "***");
+		Log.e(className, "***       https required: " + paddedOut(String.valueOf(httpsRequired()), 51) + "***");
+		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***  full-screen intent: " + paddedOut(AppRestarter.fullScreenIntentStatus(this), 52) + "***");
 		Log.e(className, "***        exact alarms: " + paddedOut(AppRestarter.exactAlarmStatus(this), 52) + "***");
-		Log.e(className, "***             overlay: " + paddedOut(
-				Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-						? String.valueOf(Settings.canDrawOverlays(this))
-						: "not required (API < 23)", 52) + "***");
+		Log.e(className, "***             overlay: " + paddedOut(overlayStatus(), 52) + "***");
+		Log.e(className, "***       notifications: " + paddedOut(notificationsStatus(), 52) + "***");
+		Log.e(className, "***     launch channel: " + paddedOut(launchNotificationChannelStatus(), 52) + "***");
+		Log.e(className, "***  battery exemption: " + paddedOut(batteryOptimizationStatus(), 52) + "***");
+		Log.e(className, "***             network: " + paddedOut(networkStatus(), 52) + "***");
+		Log.e(className, "***                                                                          ***");
+		Log.e(className, "***            INTERNET: " + paddedOut(permissionStatus("android.permission.INTERNET"), 52) + "***");
+		Log.e(className, "*** ACCESS_NETWORK_STATE: " + paddedOut(permissionStatus("android.permission.ACCESS_NETWORK_STATE"), 50) + "***");
+		Log.e(className, "*** RECEIVE_BOOT_COMPLETED: " + paddedOut(permissionStatus("android.permission.RECEIVE_BOOT_COMPLETED"), 47) + "***");
+		Log.e(className, "***           WAKE_LOCK: " + paddedOut(permissionStatus("android.permission.WAKE_LOCK"), 52) + "***");
+		Log.e(className, "***  FOREGROUND_SERVICE: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE"), 52) + "***");
+		Log.e(className, "***     FGS specialUse: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE_SPECIAL_USE"), 52) + "***");
+		Log.e(className, "***  FGS mediaPlayback: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"), 52) + "***");
+		Log.e(className, "***  POST_NOTIFICATIONS: " + paddedOut(postNotificationsStatus(), 51) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***            app name: " + paddedOut(getString(R.string.appName), 52) + "***");
 		Log.e(className, "***        version name: " + paddedOut(getString(R.string.versionName), 52) + "***");
@@ -594,6 +617,115 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "********************************************************************************");
 	}
+
+	private String overlayStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+			return "not required (API < 23)";
+		}
+		return Settings.canDrawOverlays(this) ? "granted" : "denied";
+	}
+
+	private String postNotificationsStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+			return "not required (API < 33)";
+		}
+		return permissionStatus("android.permission.POST_NOTIFICATIONS");
+	}
+
+	private String permissionStatus(String permission) {
+		return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
+	}
+
+	private String notificationsStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+			return "unknown (API < 24)";
+		}
+		NotificationManager notificationManager = getSystemService(NotificationManager.class);
+		if (notificationManager == null) {
+			return "unknown";
+		}
+		return notificationManager.areNotificationsEnabled() ? "enabled" : "disabled";
+	}
+
+	private String launchNotificationChannelStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+			return "not required (API < 26)";
+		}
+		NotificationManager notificationManager = getSystemService(NotificationManager.class);
+		if (notificationManager == null) {
+			return "unknown";
+		}
+		NotificationChannel channel = notificationManager.getNotificationChannel(
+				RestartForegroundService.NOTIFICATION_CHANNEL_ID);
+		if (channel == null) {
+			return "not created yet";
+		}
+		return "importance=" + channel.getImportance();
+	}
+
+	private String batteryOptimizationStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+			return "not required (API < 23)";
+		}
+		PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+		if (powerManager == null) {
+			return "unknown";
+		}
+		return powerManager.isIgnoringBatteryOptimizations(getPackageName())
+				? "ignored (unrestricted)"
+				: "optimizing";
+	}
+
+	private String networkStatus() {
+		ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+		if (connectivityManager == null) {
+			return "unknown";
+		}
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+			android.net.NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+			if (networkInfo == null || !networkInfo.isConnected()) {
+				return "none";
+			}
+			return networkInfo.getTypeName();
+		}
+		Network network = connectivityManager.getActiveNetwork();
+		NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
+		if (capabilities == null) {
+			return "none";
+		}
+		String transport = "other";
+		if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+			transport = "ethernet";
+		} else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+			transport = "wifi";
+		} else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+			transport = "cellular";
+		}
+		boolean internet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+		boolean validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+		return transport + " internet=" + internet + " validated=" + validated;
+	}
+
+	private String uiModeStatus() {
+		String type = "other";
+		UiModeManager uiModeManager = (UiModeManager) getSystemService(UI_MODE_SERVICE);
+		if (uiModeManager != null) {
+			switch (uiModeManager.getCurrentModeType()) {
+				case Configuration.UI_MODE_TYPE_TELEVISION:
+					type = "television";
+					break;
+				case Configuration.UI_MODE_TYPE_NORMAL:
+					type = "normal";
+					break;
+				default:
+					type = "mode=" + uiModeManager.getCurrentModeType();
+					break;
+			}
+		}
+		boolean leanback = getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
+		return type + " leanback=" + leanback + " isAndroidTV=" + isAndroidTV();
+	}
+
 	private String paddedOut(String text, int length) {
 		return String.format("%-" + length + "s", text);
 	}
