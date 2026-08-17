@@ -579,6 +579,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***          auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 52) + "***");
 		Log.e(className, "***             restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 52) + "***");
 		Log.e(className, "***  full-screen intent: " + paddedOut(AppRestarter.fullScreenIntentStatus(this), 52) + "***");
+		Log.e(className, "***        exact alarms: " + paddedOut(AppRestarter.exactAlarmStatus(this), 52) + "***");
+		Log.e(className, "***             overlay: " + paddedOut(
+				Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+						? String.valueOf(Settings.canDrawOverlays(this))
+						: "not required (API < 23)", 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***            app name: " + paddedOut(getString(R.string.appName), 52) + "***");
 		Log.e(className, "***        version name: " + paddedOut(getString(R.string.versionName), 52) + "***");

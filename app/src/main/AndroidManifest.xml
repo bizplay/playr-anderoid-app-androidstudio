@@ -50,13 +50,15 @@
 	<uses-permission android:name="android.permission.WAKE_LOCK"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 	<!-- Full-screen intent is how a specialUse FGS can start MainActivity when BAL blocks startActivity. -->
 	<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
-	<!-- Overlay is an optional BAL exemption if an operator grants it in Settings. -->
+	<!-- Overlay is a BAL exemption if an operator grants it (Settings or appops). -->
 	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-	<!--  Non exact scheduled alarms are sufficient -->
-	<!--<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>-->
+	<!-- setAlarmClock is a BAL exemption when the alarm fires (Android 10+). -->
+	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+	<uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application
@@ -134,7 +136,7 @@
 			android:name="biz.playr.RestartForegroundService"
 			android:exported="false"
 			android:enabled="true"
-			android:foregroundServiceType="specialUse">
+			android:foregroundServiceType="mediaPlayback|specialUse">
 			<property
 				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
 				android:value="Relaunch Playr after boot or after the player UI is closed on unattended displays"/>

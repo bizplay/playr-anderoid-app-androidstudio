@@ -9,6 +9,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.media.session.MediaSession;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -34,6 +35,7 @@ public class RestartForegroundService extends Service {
 	private final Handler handler = new Handler(Looper.getMainLooper());
 	private Runnable restartTask;
 	private Runnable stopTask;
+	private MediaSession mediaSession;
 
 	static boolean scheduleRestart(Context context, long delayMs) {
 		Intent intent = new Intent(context, RestartForegroundService.class);
@@ -62,12 +64,22 @@ public class RestartForegroundService extends Service {
 		}
 
 		createNotificationChannel();
+		ensureMediaSession();
 		Notification notification = buildLaunchNotification();
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-			startForeground(
-					NOTIFICATION_ID,
-					notification,
-					ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+			try {
+				startForeground(
+						NOTIFICATION_ID,
+						notification,
+						ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+								| ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+			} catch (RuntimeException ex) {
+				Log.e(className, ".onStartCommand: mediaPlayback+specialUse startForeground failed, retry specialUse", ex);
+				startForeground(
+						NOTIFICATION_ID,
+						notification,
+						ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+			}
 		} else {
 			startForeground(NOTIFICATION_ID, notification);
 		}
@@ -91,6 +103,10 @@ public class RestartForegroundService extends Service {
 			handler.removeCallbacks(stopTask);
 			stopTask = null;
 		}
+		if (mediaSession != null) {
+			mediaSession.release();
+			mediaSession = null;
+		}
 		super.onDestroy();
 	}
 
@@ -106,9 +122,8 @@ public class RestartForegroundService extends Service {
 			return;
 		}
 		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
+		AppRestarter.scheduleAlarmClockLaunch(this, 1000);
 		// startActivity does not throw when BAL blocks the launch (result code 102).
-		// Always send the PendingIntent as well; the FGS notification already has a
-		// full-screen intent for the case where both are blocked.
 		startActivityWithBalOptIn(activityIntent);
 		sendRestartPendingIntent(activityIntent);
 		stopAfterDelay();
@@ -141,7 +156,8 @@ public class RestartForegroundService extends Service {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 				Log.i(className, ".startActivityWithBalOptIn: overlay granted="
 						+ Settings.canDrawOverlays(this)
-						+ ", fullScreenIntent=" + AppRestarter.fullScreenIntentStatus(this));
+						+ ", fullScreenIntent=" + AppRestarter.fullScreenIntentStatus(this)
+						+ ", exactAlarms=" + AppRestarter.exactAlarmStatus(this));
 			}
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 				startActivity(activityIntent, createBackgroundStartOptions().toBundle());
@@ -228,5 +244,13 @@ public class RestartForegroundService extends Service {
 			builder.setPriority(Notification.PRIORITY_HIGH);
 		}
 		return builder.build();
+	}
+
+	private void ensureMediaSession() {
+		if (mediaSession != null) {
+			return;
+		}
+		mediaSession = new MediaSession(this, className);
+		mediaSession.setActive(true);
 	}
 }

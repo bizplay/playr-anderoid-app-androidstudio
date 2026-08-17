@@ -63,6 +63,49 @@ final class AppRestarter {
 		return notificationManager.canUseFullScreenIntent() ? "granted" : "denied";
 	}
 
+	static String exactAlarmStatus(Context context) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+			return "not required (API < 31)";
+		}
+		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+		if (alarmManager == null) {
+			return "unknown";
+		}
+		return alarmManager.canScheduleExactAlarms() ? "granted" : "denied";
+	}
+
+	/**
+	 * {@link AlarmManager#setAlarmClock} is a documented BAL exemption: when the alarm fires,
+	 * the app may start an activity. Used after boot because a {@code specialUse} FGS cannot.
+	 */
+	static boolean scheduleAlarmClockLaunch(Context context, long delayMs) {
+		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+		if (alarmManager == null) {
+			Log.e(className, ".scheduleAlarmClockLaunch: AlarmManager unavailable");
+			return false;
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+			Log.e(className, ".scheduleAlarmClockLaunch: exact alarms not allowed");
+			return false;
+		}
+		PendingIntent launchPendingIntent = PendingIntent.getActivity(
+				context.getApplicationContext(),
+				RESTART_PENDING_INTENT_REQUEST_CODE,
+				createRestartActivityIntent(context),
+				PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+		long triggerAt = System.currentTimeMillis() + Math.max(delayMs, 1L);
+		try {
+			alarmManager.setAlarmClock(
+					new AlarmManager.AlarmClockInfo(triggerAt, launchPendingIntent),
+					launchPendingIntent);
+			Log.i(className, ".scheduleAlarmClockLaunch: alarm clock in " + delayMs + " ms");
+			return true;
+		} catch (SecurityException ex) {
+			Log.e(className, ".scheduleAlarmClockLaunch: failed", ex);
+			return false;
+		}
+	}
+
 	/**
 	 * Launch {@link MainActivity} after {@code BOOT_COMPLETED}. Starting an activity directly
 	 * from the receiver is BAL-blocked on Android 10+; a short-lived foreground service is
@@ -87,9 +130,13 @@ final class AppRestarter {
 			return false;
 		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			boolean alarmScheduled = scheduleAlarmClockLaunch(context, 1000);
 			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity"
-					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart + ")");
-			if (!RestartForegroundService.scheduleRestart(context, 0)) {
+					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart
+					+ ", alarmClock=" + alarmScheduled
+					+ ", exactAlarms=" + exactAlarmStatus(context)
+					+ ", fullScreenIntent=" + fullScreenIntentStatus(context) + ")");
+			if (!RestartForegroundService.scheduleRestart(context, 0) && !alarmScheduled) {
 				Log.e(className, ".launchFromBoot: foreground service start was rejected");
 				return false;
 			}
