@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 
 /**
@@ -75,35 +76,49 @@ final class AppRestarter {
 	}
 
 	/**
-	 * {@link AlarmManager#setAlarmClock} is a documented BAL exemption: when the alarm fires,
-	 * the app may start an activity. Used after boot because a {@code specialUse} FGS cannot.
+	 * On Android 14 this TPV blocks FGS, PendingIntent, full-screen intent, and even
+	 * {@link AlarmManager#setAlarmClock} (BAL_BLOCK 102). Overlay is the remaining
+	 * exemption the device honours.
 	 */
-	static boolean scheduleAlarmClockLaunch(Context context, long delayMs) {
+	static boolean hasOverlayLaunchExemption(Context context) {
+		return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
+	}
+
+	static void logBackgroundLaunchPrivileges(Context context) {
+		boolean overlay = hasOverlayLaunchExemption(context);
+		Log.i(className, ".logBackgroundLaunchPrivileges: overlay=" + overlay
+				+ " fullScreenIntent=" + fullScreenIntentStatus(context)
+				+ " exactAlarms=" + exactAlarmStatus(context));
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !overlay) {
+			Log.e(className, ".logBackgroundLaunchPrivileges: Android 14+ will BAL_BLOCK MainActivity"
+					+ " until SYSTEM_ALERT_WINDOW is granted. Operator grant:"
+					+ " adb shell appops set " + context.getPackageName()
+					+ " SYSTEM_ALERT_WINDOW allow");
+		}
+	}
+
+	/**
+	 * Cancels a leftover {@link AlarmManager#setAlarmClock} relaunch. On cold power-on the
+	 * firmware already starts {@link MainActivity}; an alarm with {@code CLEAR_TASK} would
+	 * destroy that instance (BAL is allowed because the window is visible).
+	 */
+	static void cancelAlarmClockLaunch(Context context) {
 		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 		if (alarmManager == null) {
-			Log.e(className, ".scheduleAlarmClockLaunch: AlarmManager unavailable");
-			return false;
+			return;
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-			Log.e(className, ".scheduleAlarmClockLaunch: exact alarms not allowed");
-			return false;
-		}
-		PendingIntent launchPendingIntent = PendingIntent.getActivity(
+		PendingIntent launchPendingIntent = launchActivityPendingIntent(context);
+		alarmManager.cancel(launchPendingIntent);
+		launchPendingIntent.cancel();
+		Log.i(className, ".cancelAlarmClockLaunch: cancelled pending alarm-clock relaunch");
+	}
+
+	private static PendingIntent launchActivityPendingIntent(Context context) {
+		return PendingIntent.getActivity(
 				context.getApplicationContext(),
 				RESTART_PENDING_INTENT_REQUEST_CODE,
 				createRestartActivityIntent(context),
 				PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-		long triggerAt = System.currentTimeMillis() + Math.max(delayMs, 1L);
-		try {
-			alarmManager.setAlarmClock(
-					new AlarmManager.AlarmClockInfo(triggerAt, launchPendingIntent),
-					launchPendingIntent);
-			Log.i(className, ".scheduleAlarmClockLaunch: alarm clock in " + delayMs + " ms");
-			return true;
-		} catch (SecurityException ex) {
-			Log.e(className, ".scheduleAlarmClockLaunch: failed", ex);
-			return false;
-		}
 	}
 
 	/**
@@ -130,13 +145,15 @@ final class AppRestarter {
 			return false;
 		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			boolean alarmScheduled = scheduleAlarmClockLaunch(context, 1000);
+			logBackgroundLaunchPrivileges(context);
+			// Delay the FGS so firmware can start MainActivity first on a cold power-on.
+			// An alarm-clock relaunch must not run: on power-on the activity is already
+			// visible, so the alarm is BAL-allowed and CLEAR_TASK destroys the WebView.
 			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity"
 					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart
-					+ ", alarmClock=" + alarmScheduled
 					+ ", exactAlarms=" + exactAlarmStatus(context)
 					+ ", fullScreenIntent=" + fullScreenIntentStatus(context) + ")");
-			if (!RestartForegroundService.scheduleRestart(context, 0) && !alarmScheduled) {
+			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
 				Log.e(className, ".launchFromBoot: foreground service start was rejected");
 				return false;
 			}

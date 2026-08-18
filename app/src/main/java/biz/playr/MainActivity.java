@@ -155,6 +155,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		AppRestarter.clearRestartPending();
+		AppRestarter.cancelAlarmClockLaunch(this);
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setDefaultUncaughtExceptionHandler");
@@ -570,7 +571,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                            ==================                            ***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***   Android API level: " + paddedOut(String.valueOf(Build.VERSION.SDK_INT), 52) + "***");
-		Log.e(className, "***         target SDK: " + paddedOut(String.valueOf(getApplicationInfo().targetSdkVersion), 52) + "***");
+		Log.e(className, "***          target SDK: " + paddedOut(String.valueOf(getApplicationInfo().targetSdkVersion), 52) + "***");
 		Log.e(className, "***  Android build date: " + paddedOut(String.valueOf(new Date(Build.TIME)), 52) + "***");
 		Log.e(className, "***        manufacturer: " + paddedOut(Build.MANUFACTURER, 52) + "***");
 		Log.e(className, "***               brand: " + paddedOut(Build.BRAND, 52) + "***");
@@ -589,24 +590,24 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***          auto start: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.auto_start)), 52) + "***");
 		Log.e(className, "***             restart: " + paddedOut(String.valueOf(getResources().getBoolean(R.bool.restart)), 52) + "***");
-		Log.e(className, "***       https required: " + paddedOut(String.valueOf(httpsRequired()), 51) + "***");
+		Log.e(className, "***      https required: " + paddedOut(String.valueOf(httpsRequired()), 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***  full-screen intent: " + paddedOut(AppRestarter.fullScreenIntentStatus(this), 52) + "***");
 		Log.e(className, "***        exact alarms: " + paddedOut(AppRestarter.exactAlarmStatus(this), 52) + "***");
 		Log.e(className, "***             overlay: " + paddedOut(overlayStatus(), 52) + "***");
 		Log.e(className, "***       notifications: " + paddedOut(notificationsStatus(), 52) + "***");
-		Log.e(className, "***     launch channel: " + paddedOut(launchNotificationChannelStatus(), 52) + "***");
-		Log.e(className, "***  battery exemption: " + paddedOut(batteryOptimizationStatus(), 52) + "***");
+		Log.e(className, "***      launch channel: " + paddedOut(launchNotificationChannelStatus(), 52) + "***");
+		Log.e(className, "***   battery exemption: " + paddedOut(batteryOptimizationStatus(), 52) + "***");
 		Log.e(className, "***             network: " + paddedOut(networkStatus(), 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***            INTERNET: " + paddedOut(permissionStatus("android.permission.INTERNET"), 52) + "***");
-		Log.e(className, "*** ACCESS_NETWORK_STATE: " + paddedOut(permissionStatus("android.permission.ACCESS_NETWORK_STATE"), 50) + "***");
-		Log.e(className, "*** RECEIVE_BOOT_COMPLETED: " + paddedOut(permissionStatus("android.permission.RECEIVE_BOOT_COMPLETED"), 47) + "***");
+		Log.e(className, "*** ACCESS_NETWORK_STATE: " + paddedOut(permissionStatus("android.permission.ACCESS_NETWORK_STATE"), 51) + "***");
+		Log.e(className, "*** RECEIVE_BOOT_COMPLETED: " + paddedOut(permissionStatus("android.permission.RECEIVE_BOOT_COMPLETED"), 49) + "***");
 		Log.e(className, "***           WAKE_LOCK: " + paddedOut(permissionStatus("android.permission.WAKE_LOCK"), 52) + "***");
 		Log.e(className, "***  FOREGROUND_SERVICE: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE"), 52) + "***");
 		Log.e(className, "***     FGS specialUse: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE_SPECIAL_USE"), 52) + "***");
 		Log.e(className, "***  FGS mediaPlayback: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"), 52) + "***");
-		Log.e(className, "***  POST_NOTIFICATIONS: " + paddedOut(postNotificationsStatus(), 51) + "***");
+		Log.e(className, "*** POST_NOTIFICATIONS: " + paddedOut(postNotificationsStatus(), 52) + "***");
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***            app name: " + paddedOut(getString(R.string.appName), 52) + "***");
 		Log.e(className, "***        version name: " + paddedOut(getString(R.string.versionName), 52) + "***");

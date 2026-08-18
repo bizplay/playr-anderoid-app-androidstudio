@@ -122,7 +122,6 @@ public class RestartForegroundService extends Service {
 			return;
 		}
 		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
-		AppRestarter.scheduleAlarmClockLaunch(this, 1000);
 		// startActivity does not throw when BAL blocks the launch (result code 102).
 		startActivityWithBalOptIn(activityIntent);
 		sendRestartPendingIntent(activityIntent);
