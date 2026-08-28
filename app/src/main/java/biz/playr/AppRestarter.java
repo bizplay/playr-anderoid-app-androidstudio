@@ -20,6 +20,8 @@ import android.util.Log;
 final class AppRestarter {
 	private static final String className = BuildConfig.APP_NAMESPACE + ".AppRestarter";
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
+	private static final String RESTART_COORDINATION_PREFS = "playr_restart_coordination";
+	private static final String KEY_RESTART_SCHEDULED_AT = "scheduled_at";
 
 	// Short delay so onDestroy can finish tearing down the WebView, while the foreground service
 	// still has launch privileges. The historical 30s wait was for Android 3/4 resource cleanup
@@ -37,6 +39,30 @@ final class AppRestarter {
 
 	static void clearRestartPending() {
 		restartPending = false;
+	}
+
+	/** Shared across processes so {@link PlayerWatchdogService} does not double-schedule a relaunch. */
+	static void markRestartScheduled(Context context) {
+		context.getApplicationContext()
+				.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+				.edit()
+				.putLong(KEY_RESTART_SCHEDULED_AT, System.currentTimeMillis())
+				.commit();
+	}
+
+	static boolean wasRestartScheduledRecently(Context context, long withinMs) {
+		long scheduledAt = context.getApplicationContext()
+				.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+				.getLong(KEY_RESTART_SCHEDULED_AT, 0L);
+		return scheduledAt > 0 && System.currentTimeMillis() - scheduledAt < withinMs;
+	}
+
+	static void clearRestartScheduledMark(Context context) {
+		context.getApplicationContext()
+				.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+				.edit()
+				.remove(KEY_RESTART_SCHEDULED_AT)
+				.commit();
 	}
 
 	static Intent createRestartActivityIntent(Context context) {
@@ -206,11 +232,16 @@ final class AppRestarter {
 
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
 			Log.i(className, ".restartAfterUncaughtException: scheduling alarm restart");
-			return scheduleAlarmRestart(context);
+			if (scheduleAlarmRestart(context)) {
+				markRestartScheduled(context);
+				return true;
+			}
+			return false;
 		}
 
 		Log.i(className, ".restartAfterUncaughtException: immediate relaunch");
 		context.getApplicationContext().startActivity(createRestartActivityIntent(context));
+		markRestartScheduled(context);
 		return true;
 	}
 
@@ -255,10 +286,15 @@ final class AppRestarter {
 				clearRestartPending();
 				return false;
 			}
+			markRestartScheduled(context);
 			return true;
 		}
 
-		return scheduleAlarmRestart(context);
+		if (scheduleAlarmRestart(context)) {
+			markRestartScheduled(context);
+			return true;
+		}
+		return false;
 	}
 
 	private static boolean scheduleAlarmRestart(Context context) {

@@ -74,6 +74,9 @@ public class BootUpReceiver extends BroadcastReceiver{
 		} else {
 			Log.i(className, ".onReceive: MainActivity not started from boot receiver");
 		}
+		if (context.getResources().getBoolean(R.bool.restart)) {
+			PlayerWatchdogClient.enableMonitoring(context, readStoredPlayerId(context));
+		}
 // }
 		Log.i(className, ".onReceive: end");
 	}
@@ -111,6 +114,11 @@ public class BootUpReceiver extends BroadcastReceiver{
 		SharedPreferences defaultSharedPreferences = getDefaultSharedPreferences(context);
 //		return defaultSharedPreferences.getInt(getString(context, R.string.activity_state_key), -1);
 		return defaultSharedPreferences.getInt("activityState", -1);
+	}
+
+	private String readStoredPlayerId(Context context) {
+		SharedPreferences prefs = context.getSharedPreferences(MainActivity.class.getName(), Context.MODE_PRIVATE);
+		return prefs.getString(context.getString(R.string.player_id_store), "");
 	}
 
 	private void storeActivityCreatedAt(Context context) {

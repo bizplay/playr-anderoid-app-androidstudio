@@ -21,8 +21,8 @@ import android.os.IBinder;
 //import android.os.PowerManager;
 import android.util.Log;
 
-// If this service should run in a separate process the communication used here will not do
-// Instead use a Broadcast and BroadcastReceiver to communicate between Service and MainActivity
+// If this service runs in a separate process, use {@link PlayerWatchdogService} instead.
+// Server reboot polling and local crash recovery now live in the :watchdog process.
 public class CheckRestartService extends Service {
 	private static final String className = BuildConfig.APP_NAMESPACE + ".CheckRestartS";
 	// use type long since the second and third parameter for

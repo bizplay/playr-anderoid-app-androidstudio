@@ -133,6 +133,16 @@
 			android:exported="false"
 			android:enabled="true"/>
 		<service
+			android:name="biz.playr.PlayerWatchdogService"
+			android:exported="false"
+			android:enabled="true"
+			android:process=":watchdog"
+			android:foregroundServiceType="specialUse">
+			<property
+				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+				android:value="Monitor Playr player process and restart after native WebView crash"/>
+		</service>
+		<service
 			android:name="biz.playr.RestartForegroundService"
 			android:exported="false"
 			android:enabled="true"

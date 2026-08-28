@@ -10,9 +10,13 @@
     <string name="activity_created_at_key">activityCreatedAt</string>
     <string name="boot_completed_at_key">bootCompletedAt</string>
     <string name="player_id_cookie_name">playback_device_id</string>
-    <string name="watchdog_name">Playr Watchdog</string>
-    <string name="restart_notification_channel_name">Playr restart</string>
-    <string name="restart_notification_channel_description">Keeps Playr running briefly so it can restart after being closed.</string>
-    <string name="restart_notification_title">Restarting Playr</string>
-    <string name="restart_notification_text">Playr will reopen shortly.</string>
+    <string name="watchdog_name">Player Watchdog</string>
+    <string name="restart_notification_channel_name">Player restart</string>
+    <string name="restart_notification_channel_description">Keeps Player running briefly so it can restart after being closed.</string>
+    <string name="restart_notification_title">Restarting Player</string>
+    <string name="restart_notification_text">Player will reopen shortly.</string>
+    <string name="watchdog_notification_channel_name">Player watchdog</string>
+    <string name="watchdog_notification_channel_description">Monitors the player process and restarts it after a crash.</string>
+    <string name="watchdog_notification_title">Player monitor</string>
+    <string name="watchdog_notification_text">Watching for player crashes</string>
 </resources>

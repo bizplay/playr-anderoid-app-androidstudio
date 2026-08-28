@@ -19,7 +19,6 @@ import android.app.NotificationManager;
 import android.app.UiModeManager;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
-import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.content.Context;
 import android.content.Intent;
@@ -34,7 +33,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -51,6 +49,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebResourceError;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.webkit.WebViewClient;
@@ -73,7 +72,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final String className = BuildConfig.APP_NAMESPACE + ".MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
-	private ServiceConnection serviceConnection = null;
 	// Memory reporting
 	private ActivityManager.MemoryInfo firstMemoryInfo = null;
 	private long firstAvailableHeapSizeInMB = 0;
@@ -82,6 +80,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private boolean continueMemoryCheck = true;
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
+	private static final long HEARTBEAT_INTERVAL_MS = PlayerWatchdogService.CHECK_INTERVAL_MS;
+	private Handler heartbeatHandler = null;
+	private Runnable heartbeatRunner = null;
+	private boolean continueHeartbeat = false;
 	// TWA related
 	// private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -155,6 +157,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		AppRestarter.clearRestartPending();
+		AppRestarter.clearRestartScheduledMark(this);
 		AppRestarter.cancelAlarmClockLaunch(this);
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
@@ -219,6 +222,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 			getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, backPressedHandler());
 		}
+
+		startWatchdogHeartbeat();
 
 		Log.i(className, "onCreate end");
 	}
@@ -386,37 +391,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onStart() {
 		Log.i(className, "override onStart");
 		super.onStart();
-		if (this.twaServiceConnection != null) {
-			// bind to CheckRestartService
-			Intent intent = new Intent(this, CheckRestartService.class);
-//			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
-      } else {
-				bindService(intent, (ServiceConnection) this.twaServiceConnection, Context.BIND_AUTO_CREATE);
-			}
-      // checkRestartService = TODO how do we point this attribute to the service instance
-			Log.i(className, "onStart: restart service is bound to twaServiceConnection (TWA is used) [BIND_AUTO_CREATE]");
-			bound = true;
-		} else if (this.webView != null) {
-			if (this.checkRestartService == null) {
-				Log.e(className, "onStart: webView is defined but checkRestartService is null.");
-			}
-			Intent intent = new Intent(this, CheckRestartService.class);
-//			intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
-      } else {
-				bindService(intent, this.serviceConnection, Context.BIND_AUTO_CREATE);
-			}
-      Log.i(className, "onStart: restart service is bound to serviceConnection (WebView is used) [BIND_AUTO_CREATE]");
-			bound = true;
-			if (this.checkRestartService == null) {
-				Log.e(className, "onStart: checkRestartService is null after bindService.");
-			}
-		} else {
-			Log.e(className, "onStart: twaServiceConnection and webView are null; restart service not bound");
-		}
 	}
 
 	@Override
@@ -438,9 +412,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	protected void onStop() {
 		Log.i(className, "override onStop");
 		this.unBindServiceConnection();
+		stopWatchdogHeartbeat();
 		// Start the delayed restart while we are still more likely to be allowed to start a
 		// foreground service. Skip configuration changes (rotation) so those do not restart-loop.
 		if (isFinishing() && !isChangingConfigurations()) {
+			if (!getResources().getBoolean(R.bool.restart)) {
+				PlayerWatchdogClient.disableMonitoring(getApplicationContext());
+			}
 			Log.i(className, "onStop: activity is finishing, scheduling delayed restart");
 			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
 		}
@@ -487,6 +465,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		Log.i(className, "onDestroy: stopMemoryChecking");
 		this.stopMemoryChecking();
+		stopWatchdogHeartbeat();
 		// the onStop method should have unbound the service already, but just to be sure
 		if (bound) {
 			unBindServiceConnection();
@@ -735,16 +714,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			checkRestartService.setCallbacks(null);
 			Log.i(className, "unBindServiceConnection: callbacks set to null on restart service");
 		}
-		if (bound) {
-			if (this.twaServiceConnection != null) {
-				unbindService(this.twaServiceConnection);
-				bound = false;
-				Log.i(className, "unBindServiceConnection: TWA service connection was unbound");
-			} else if (webView != null) {
-				unbindService(this.serviceConnection);
-				bound = false;
-				Log.i(className, "unBindServiceConnection: service connection (webView fall back) was unbound");
-			}
+		if (bound && this.twaServiceConnection != null) {
+			unbindService(this.twaServiceConnection);
+			bound = false;
+			Log.i(className, "unBindServiceConnection: TWA service connection was unbound");
 		}
 	}
 
@@ -847,31 +820,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			result.loadUrl(loaderUrl);
 		}
 
-		// Callbacks for service binding, passed to bindService()
-		serviceConnection = new ServiceConnection() {
-			private static final String className = BuildConfig.APP_NAMESPACE + ".ServiceConnec";
-
-			@Override
-			public void onServiceConnected(ComponentName componentName, IBinder service) {
-//			public void onServiceConnected(ComponentName componentName, android.os.BinderProxy service) {
-				Log.i(className, "override onServiceConnected");
-				// cast the IBinder and get CheckRestartService instance
-				// service is an android.os.BinderProxy
-				CheckRestartService.LocalBinder binder = (CheckRestartService.LocalBinder) service;
-				checkRestartService = binder.getService();
-//				service.isBinderAlive();
-				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
-				bound = true;
-				Log.i(className, "onServiceConnected: service bound");
-			}
-
-			@Override
-			public void onServiceDisconnected(ComponentName componentName) {
-				Log.i(className, "override onServiceDisconnected");
-				checkRestartService.setCallbacks(null);
-				bound = false;
-			}
-		};
 		return result;
 	}
 
@@ -1040,6 +988,21 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 							+ " URL: " + request.getUrl().toString());
 				}
 				super.onReceivedHttpError(view, request, errorResponse);
+			}
+
+			@Override
+			public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+				Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
+						+ " priority=" + detail.rendererPriorityAtExit());
+				MainActivity activity = MainActivity.this;
+				activity.runOnUiThread(() -> {
+					if (!activity.isFinishing()) {
+						AppRestarter.scheduleDelayedBackgroundRestart(
+								activity.getApplicationContext(), false);
+						activity.finish();
+					}
+				});
+				return true;
 			}
 		};
 	};
@@ -1280,6 +1243,32 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		SharedPreferences.Editor editor = sharedPreferences.edit();
 		editor.putString(getString(R.string.player_id_store), value);
 		editor.commit();
+	}
+
+	private void startWatchdogHeartbeat() {
+		if (!getResources().getBoolean(R.bool.restart)) {
+			return;
+		}
+		String playerId = getPlayerId();
+		PlayerWatchdogClient.enableMonitoring(this, playerId);
+		if (heartbeatHandler == null) {
+			heartbeatHandler = new Handler(Looper.getMainLooper());
+		}
+		continueHeartbeat = true;
+		heartbeatRunner = () -> {
+			if (continueHeartbeat) {
+				PlayerWatchdogClient.sendHeartbeat(getApplicationContext(), getPlayerId());
+				heartbeatHandler.postDelayed(heartbeatRunner, HEARTBEAT_INTERVAL_MS);
+			}
+		};
+		heartbeatHandler.postDelayed(heartbeatRunner, HEARTBEAT_INTERVAL_MS);
+	}
+
+	private void stopWatchdogHeartbeat() {
+		continueHeartbeat = false;
+		if (heartbeatHandler != null && heartbeatRunner != null) {
+			heartbeatHandler.removeCallbacks(heartbeatRunner);
+		}
 	}
 
 	private Date getActivityCreatedAt() {
