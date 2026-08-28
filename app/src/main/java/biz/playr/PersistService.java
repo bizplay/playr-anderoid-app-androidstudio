@@ -16,8 +16,8 @@ import android.util.Log;
 public class PersistService extends Service {
 	// see http://stackoverflow.com/questions/18276355/how-to-keep-a-foreground-app-running-24-7
 	static final long intervalBetweenForegroundChecks = 30000; // 30 seconds in milliseconds
-	private static final String className = "biz.playr.PersistServic";
-	//private static final String YOUR_APP_PACKAGE_NAME = "biz.playr";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".PersistServic";
+	//private static final String YOUR_APP_PACKAGE_NAME = BuildConfig.APP_NAMESPACE;
 
 	// see http://stackoverflow.com/questions/6446221/get-context-in-a-service
 	// and http://stackoverflow.com/questions/7619917/how-to-get-context-in-android-service-class

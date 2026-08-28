@@ -9,8 +9,6 @@
     <string name="activity_state_key">activityState</string>
     <string name="activity_created_at_key">activityCreatedAt</string>
     <string name="boot_completed_at_key">bootCompletedAt</string>
-    <string name="preferences_file_name">biz.playr.preferences</string>
-    <string name="playr_urls">www.playr.biz|play.playr.biz|playr.biz</string>
     <string name="player_id_cookie_name">playback_device_id</string>
     <string name="watchdog_name">Playr Watchdog</string>
     <string name="restart_notification_channel_name">Playr restart</string>

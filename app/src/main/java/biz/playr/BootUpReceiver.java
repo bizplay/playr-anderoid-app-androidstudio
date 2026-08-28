@@ -13,7 +13,7 @@ import android.util.Log;
 import java.util.Date;
 
 public class BootUpReceiver extends BroadcastReceiver{
-	private static final String className = "biz.playr.BootUpReceive";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".BootUpReceive";
 	private static final int identifier = 12345;
 	/* this class is used to force a (re)start of the MainActivity after the device is rebooted
 	 * for instance when Android has updated

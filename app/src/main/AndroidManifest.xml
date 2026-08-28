@@ -62,7 +62,7 @@
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application
-		android:name="biz.playr.MainApplication"
+		android:name= "biz.playr.MainApplication"
 		android:hardwareAccelerated="true"
 		android:allowBackup="true"
 		android:icon="@drawable/ic_launcher"

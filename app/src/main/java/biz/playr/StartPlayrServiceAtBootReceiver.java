@@ -6,14 +6,14 @@ import android.content.Intent;
 import android.util.Log;
 
 public class StartPlayrServiceAtBootReceiver extends BroadcastReceiver {
-	private static final String className = "biz.playr.StartPlayrSrv";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".StartPlayrSrv";
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		Log.i(className, "override onReceive");
 		Log.i(className,".onReceive, received intent:" + intent.getAction());
 		if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-			Intent serviceIntent = new Intent(context, biz.playr.PlayrService.class);
+			Intent serviceIntent = new Intent(context, PlayrService.class);
 			context.startService(serviceIntent);
 			Log.i(className, "onReceive: started PlayrService");
 		}

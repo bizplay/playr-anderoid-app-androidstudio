@@ -5,7 +5,7 @@ import android.util.Log;
 
 /** Initializes native components when the user starts the application. */
 public class MainApplication extends Application {
-	private static final String className = "MainApplication";
+	private static final String className =  BuildConfig.APP_NAMESPACE + ".MainApplicati";
 
 	// Singleton instance
 	private static MainApplication instance = null;

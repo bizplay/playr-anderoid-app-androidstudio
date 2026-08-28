@@ -7,7 +7,7 @@ import android.util.Log;
  * see http://chintanrathod.com/auto-restart-application-after-crash-forceclose-in-android/
  */
 class DefaultExceptionHandler implements UncaughtExceptionHandler {
-	private static final String className = "biz.playr.DefaultExcept";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".DefaultExcept";
 	private final Activity activity;
 	private final Thread.UncaughtExceptionHandler defaultUEH;
 
@@ -45,8 +45,7 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 			}
 
 			if (getActivity().getApplicationContext().getResources().getBoolean(R.bool.restart)) {
-				Log.i(className, ".uncaughtException -> immediate relaunch");
-				AppRestarter.restartImmediateRelaunch(getActivity(), false);
+				AppRestarter.restartAfterUncaughtException(getActivity(), false);
 				Log.e(className, "uncaughtException: activity.finish() !!! About to restart application !!!");
 				getActivity().finish();
 				defaultUEH.uncaughtException(thread, ex);

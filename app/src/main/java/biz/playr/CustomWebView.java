@@ -12,7 +12,7 @@ import android.webkit.WebView;
 import androidx.annotation.RequiresApi;
 
 public class CustomWebView extends WebView {
-    private static final String className = "biz.playr.CustomWebView";
+    private static final String className = BuildConfig.APP_NAMESPACE + ".CustomWebView";
     Context myContext;
     View.OnTouchListener onTouchListener = new View.OnTouchListener() {
         public final static int FINGER_RELEASED = 0;

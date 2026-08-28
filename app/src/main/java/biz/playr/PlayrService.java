@@ -6,7 +6,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 public class PlayrService extends Service{
-	private static final String className = "biz.playr.PlayrService";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".PlayrService";
 
 	@Override
 	public void onCreate() {

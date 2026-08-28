@@ -18,7 +18,7 @@ import android.util.Log;
  * when the app is being closed.
  */
 final class AppRestarter {
-	private static final String className = "biz.playr.AppRestarter";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".AppRestarter";
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
 
 	// Short delay so onDestroy can finish tearing down the WebView, while the foreground service
@@ -187,6 +187,30 @@ final class AppRestarter {
 				restartImmediateRelaunch(activity, force);
 			}
 		});
+		return true;
+	}
+
+	/**
+	 * Restarts after an uncaught Java exception. Pre-Q uses {@link AlarmManager} so the
+	 * {@link PendingIntent} fires after the process is killed; Android 10+ relaunches
+	 * immediately while the process is still alive (BAL is not an issue during crash teardown).
+	 */
+	static boolean restartAfterUncaughtException(Context context, boolean force) {
+		if (!shouldRestart(context, force)) {
+			return false;
+		}
+		if (!tryMarkRestartPending()) {
+			Log.i(className, ".restartAfterUncaughtException: restart already pending, skipping");
+			return false;
+		}
+
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+			Log.i(className, ".restartAfterUncaughtException: scheduling alarm restart");
+			return scheduleAlarmRestart(context);
+		}
+
+		Log.i(className, ".restartAfterUncaughtException: immediate relaunch");
+		context.getApplicationContext().startActivity(createRestartActivityIntent(context));
 		return true;
 	}
 

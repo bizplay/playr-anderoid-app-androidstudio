@@ -70,7 +70,7 @@ import androidx.webkit.WebViewCompat;
 
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
-	private static final String className = "biz.playr.MainActivity";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".MainActivity";
 	private CheckRestartService checkRestartService;
 	private boolean bound = false;
 	private ServiceConnection serviceConnection = null;
@@ -461,17 +461,17 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Having this logic here causes a restart loop when the device changes
 		// aspect the ratio.
 		// Log.e(className, "onDestroy: Prepare to restart the app.");
-		// Intent intent = new Intent(this, biz.playr.MainActivity.class);
+		// Intent intent = new Intent(this, MainActivity.class);
 		//
 		// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
 		// | Intent.FLAG_ACTIVITY_CLEAR_TASK
 		// | Intent.FLAG_ACTIVITY_NEW_TASK);
 		//
 		// PendingIntent pendingIntent = PendingIntent.getActivity(
-		// biz.playr.MainApplication.getInstance().getBaseContext(), 0, intent, intent.getFlags());
+		// MainApplication.getInstance().getBaseContext(), 0, intent, intent.getFlags());
 		//
 		// //Following code will restart your application after <delay> seconds
-		// AlarmManager mgr = (AlarmManager) biz.playr.MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
+		// AlarmManager mgr = (AlarmManager) MainApplication.getInstance().getBaseContext().getSystemService(Context.ALARM_SERVICE);
 		// mgr.set(AlarmManager.RTC, System.currentTimeMillis() +
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//
@@ -849,7 +849,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// Callbacks for service binding, passed to bindService()
 		serviceConnection = new ServiceConnection() {
-			private static final String className = "biz.playr.ServiceConnec";
+			private static final String className = BuildConfig.APP_NAMESPACE + ".ServiceConnec";
 
 			@Override
 			public void onServiceConnected(ComponentName componentName, IBinder service) {
@@ -857,7 +857,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				Log.i(className, "override onServiceConnected");
 				// cast the IBinder and get CheckRestartService instance
 				// service is an android.os.BinderProxy
-				biz.playr.CheckRestartService.LocalBinder binder = (biz.playr.CheckRestartService.LocalBinder) service;
+				CheckRestartService.LocalBinder binder = (CheckRestartService.LocalBinder) service;
 				checkRestartService = binder.getService();
 //				service.isBinderAlive();
 				checkRestartService.setCallbacks(MainActivity.this); // bind IServiceCallbacks
@@ -904,7 +904,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private WebChromeClient createWebChromeClient() {
 		return new WebChromeClient() {
-			private final String className = "biz.playr.WebChromeClie";
+			private final String className = BuildConfig.APP_NAMESPACE + ".WebChromeClie";
 			// private int count = 0;
 
 			@Override
@@ -932,7 +932,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 	private WebViewClient createWebViewClient() {
 		return new WebViewClient() {
-			private static final String className = "biz.playr.WebViewClient";
+			private static final String className = BuildConfig.APP_NAMESPACE + ".WebViewClient";
 
 			// Documentation says: Note: Do not call WebView#loadUrl(String) with the request's
 			// URL and then return true. This unnecessarily cancels the current load and starts
@@ -1178,7 +1178,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private class TwaCustomTabsServiceConnection extends CustomTabsServiceConnection {
-		private static final String className = "biz.playr.TwaCusTbsSrvC";
+		private static final String className = BuildConfig.APP_NAMESPACE + ".TwaCusTbsSrvC";
 
 		public void onCustomTabsServiceConnected(ComponentName componentName, CustomTabsClient client) {
 			Log.i(className, " override onCustomTabsServiceConnected");

@@ -25,7 +25,7 @@ import android.util.Log;
  * full-screen intent and {@link PendingIntent#send} is always tried after {@code startActivity}.
  */
 public class RestartForegroundService extends Service {
-	private static final String className = "biz.playr.RestartFgService";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".RestartFgService";
 	private static final String EXTRA_DELAY_MS = "delay_ms";
 	private static final int NOTIFICATION_ID = 1001;
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;

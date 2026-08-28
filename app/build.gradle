@@ -74,6 +74,11 @@ android {
         // preferences file
         resValue "string", "preferences_file_name", appManifest.name + ".preferences"
 
+        // Playr URLs
+        resValue "string", "playr_urls", "${PLAYR_URLS}"
+
+        resValue "string", "app_namespace", namespace
+
         // auto start and restart behaviour
         resValue "bool", "auto_start", "${AUTO_START}"
         resValue "bool", "restart", "${RESTART}"
@@ -103,6 +108,10 @@ android {
                     "site": "http://$twaManifest.hostName"
                 }
             }]"""
+
+        // Build features
+        buildConfigField "String", "APP_NAMESPACE", "\"${project.property('APP_NAMESPACE')}\""
+
         // To get the .well-known/assetlinks.json set up so this app can be verified (and the URL bar is removed)
         // see: https://developers.google.com/digital-asset-links/v1/getting-started
         // and: https://developers.google.com/web/android/trusted-web-activity/integration-guide
@@ -171,6 +180,9 @@ android {
             signingConfig = signingConfigs.debug
             resValue "string", "app_name", appManifest.name + "Debug"
         }
+    }
+    buildFeatures {
+        buildConfig = true   // required in AGP 8+, off by default
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
