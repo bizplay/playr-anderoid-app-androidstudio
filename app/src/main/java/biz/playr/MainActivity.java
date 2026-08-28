@@ -70,7 +70,6 @@ import androidx.webkit.WebViewCompat;
 public class MainActivity extends Activity implements IServiceCallbacks {
 	private WebView webView = null;
 	private static final String className = BuildConfig.APP_NAMESPACE + ".MainActivity";
-	private CheckRestartService checkRestartService;
 	private boolean bound = false;
 	// Memory reporting
 	private ActivityManager.MemoryInfo firstMemoryInfo = null;
@@ -710,10 +709,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		return String.format("%-" + length + "s", text);
 	}
 	private void unBindServiceConnection() {
-		if (checkRestartService != null) {
-			checkRestartService.setCallbacks(null);
-			Log.i(className, "unBindServiceConnection: callbacks set to null on restart service");
-		}
 		if (bound && this.twaServiceConnection != null) {
 			unbindService(this.twaServiceConnection);
 			bound = false;
