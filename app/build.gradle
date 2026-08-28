@@ -66,10 +66,13 @@ android {
         targetSdkVersion 36
 
         // The name for the application on the Android Launcher
-        resValue "string", "appName", appManifest.name
+        resValue "string", "app_name", appManifest.name
 
         // The name for the application on the Android Launcher
         resValue "string", "versionName", appManifest.versionName
+
+        // preferences file
+        resValue "string", "preferences_file_name", appManifest.name + ".preferences"
 
         // auto start and restart behaviour
         resValue "bool", "auto_start", "${AUTO_START}"
@@ -166,7 +169,7 @@ android {
             renderscriptDebuggable true
             renderscriptOptimLevel = 3
             signingConfig = signingConfigs.debug
-            resValue "string", "appName", appManifest.name + "Debug"
+            resValue "string", "app_name", appManifest.name + "Debug"
         }
     }
     compileOptions {

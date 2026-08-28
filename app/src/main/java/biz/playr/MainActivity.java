@@ -609,7 +609,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***      FGS mediaPlayback: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"), 49) + "***");
 		Log.e(className, "***     POST_NOTIFICATIONS: " + paddedOut(postNotificationsStatus(), 49) + "***");
 		Log.e(className, "***                                                                          ***");
-		Log.e(className, "***               app name: " + paddedOut(getString(R.string.appName), 49) + "***");
+		Log.e(className, "***               app name: " + paddedOut(getString(R.string.app_name), 49) + "***");
 		Log.e(className, "***           version name: " + paddedOut(getString(R.string.versionName), 49) + "***");
 		Log.e(className, "***               hostname: " + paddedOut(getString(R.string.hostName), 49) + "***");
 		Log.e(className, "***                                                                          ***");
