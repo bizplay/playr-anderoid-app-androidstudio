@@ -117,7 +117,8 @@ public class BootUpReceiver extends BroadcastReceiver{
 	}
 
 	private String readStoredPlayerId(Context context) {
-		SharedPreferences prefs = context.getSharedPreferences(MainActivity.class.getName(), Context.MODE_PRIVATE);
+		// Activity.getPreferences() stores under the local class name ("MainActivity").
+		SharedPreferences prefs = context.getSharedPreferences("MainActivity", Context.MODE_PRIVATE);
 		return prefs.getString(context.getString(R.string.player_id_store), "");
 	}
 

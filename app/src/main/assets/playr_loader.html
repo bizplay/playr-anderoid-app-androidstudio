@@ -63,11 +63,12 @@
       document.getElementById("countdown").style.display = "none";
       document.getElementById("parameters").style.display = "none";
       document.getElementById("ajax_loader").style.display = "none";
-      // Append Date param to ensure cache bypass
+      document.getElementById("exception_message").style.display = "none";
+      // Append Date param to ensure cache bypass. Navigate immediately: a delayed
+      // setTimeout can be frozen by WebView.onPause() and leave the loader stuck.
       var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version + "&ts=" + escape(new Date().getTime());
-      var timeoutHandle = setTimeout(function() {
-        window.location = windowLocation;
-      } ,2000);
+      console.error("gotoPlayer navigate " + windowLocation);
+      window.location = windowLocation;
       console.error("gotoPlayer end");
     };
 

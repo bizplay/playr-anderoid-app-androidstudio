@@ -80,9 +80,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	private static final long HEARTBEAT_INTERVAL_MS = PlayerWatchdogService.CHECK_INTERVAL_MS;
+	/** If play.playr.biz has not loaded by then, treat the local loader as stuck and recover. */
+	private static final long LOADER_STUCK_TIMEOUT_MS = 60_000L;
+	private static final String PLAYER_HOST = "play.playr.biz";
 	private Handler heartbeatHandler = null;
 	private Runnable heartbeatRunner = null;
 	private boolean continueHeartbeat = false;
+	private Handler loaderWatchHandler = null;
+	private Runnable loaderStuckRunner = null;
+	private boolean playbackContentLoaded = false;
 	// TWA related
 	// private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -405,7 +411,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	@Override
 	protected void onPause() {
 		Log.i(className, "override onPause");
-		if (webView != null) { webView.onPause(); }
+		// Do not pause the WebView while still on the local loader: that freezes JS timers
+		// (including navigation to play.playr.biz) and can leave "Starting playback..." forever.
+		if (webView != null && playbackContentLoaded) {
+			webView.onPause();
+		}
 		super.onPause();
 	}
 
@@ -811,9 +821,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			CookieManager.setAcceptFileSchemeCookies(true);
 		}
 		if (initialiseWebContent) {
+			playbackContentLoaded = false;
 			String loaderUrl = LOCAL_ASSET_BASE + pageUrl(playerId, result.getSettings().getUserAgentString());
 			Log.i(className, "openWebView: loadUrl " + loaderUrl);
 			result.loadUrl(loaderUrl);
+			armLoaderStuckWatch();
 		}
 
 		return result;
@@ -859,17 +871,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-//				Log.i(className, "override onConsoleMessage");
-				// Log.i(className,"override onConsoleMessage: " +
-				// consoleMessage.message());
-				// count++;
-				// if (count == 10) {
-				// Log.i(className, ">>>>>> override onConsoleMessage, throw Exception");
-				// // throw new IllegalArgumentException("Test exception");
-				// } else {
-				// Log.i(className, ">>>>>> override onConsoleMessage, count = " + count);
-				// }
-				return super.onConsoleMessage(consoleMessage);
+				Log.i(className, "console." + consoleMessage.messageLevel()
+						+ " [" + consoleMessage.sourceId() + ":" + consoleMessage.lineNumber() + "] "
+						+ consoleMessage.message());
+				return true;
 			}
 		};
 	};
@@ -892,96 +897,77 @@ public class MainActivity extends Activity implements IServiceCallbacks {
       public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         Log.i(className, "shouldOverrideUrlLoading - request url: " + request.getUrl());
 				return false; // then it is not handled by default action
-//        return super.shouldOverrideUrlLoading(view, request);
 			}
 			// This version of this method is deprecated from API level 24
       @Override
       public boolean shouldOverrideUrlLoading(WebView view, String url) {
 				Log.i(className, "shouldOverrideUrlLoading - url: " + url);
 				return false; // then it is not handled by default action
-//        return super.shouldOverrideUrlLoading(view, url);
 			}
-      // see https://stackoverflow.com/a/63707709
-      // https://developer.android.com/reference/kotlin/androidx/webkit/WebViewAssetLoader
+
+			@Override
+			public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+				Log.i(className, "onPageStarted: " + url);
+				if (isPlayerContentUrl(url)) {
+					cancelLoaderStuckWatch();
+				} else if (isLoaderUrl(url)) {
+					playbackContentLoaded = false;
+					armLoaderStuckWatch();
+				}
+				super.onPageStarted(view, url, favicon);
+			}
+
+			@Override
+			public void onPageFinished(WebView view, String url) {
+				Log.i(className, "onPageFinished: " + url);
+				if (isPlayerContentUrl(url)) {
+					playbackContentLoaded = true;
+					cancelLoaderStuckWatch();
+				}
+				super.onPageFinished(view, url);
+			}
+
       @Override
       public WebResourceResponse shouldInterceptRequest(WebView view,
                                                         WebResourceRequest request) {
-        //Log.i(className, "shouldInterceptRequest - request url: " + request.getUrl());
         return assetLoader.shouldInterceptRequest(request.getUrl());
       }
-      // option to redirect/redefine the URL that is used to get a resource
-//      @Override
-//      public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-//        if (request != null && request.getUrl() != null && request.getMethod().equalsIgnoreCase("get")) {
-//          String scheme = request.getUrl().getScheme().trim();
-//          if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) {
-//            try {
-//              URL url = new URL(injectIsParams(request.getUrl().toString()));
-//              URLConnection connection = url.openConnection();
-//              return new WebResourceResponse(connection.getContentType(), connection.getHeaderField("encoding"), connection.getInputStream());
-//            } catch (MalformedURLException e) {
-//              e.printStackTrace();
-//            } catch (IOException e) {
-//              e.printStackTrace();
-//            }
-//          }
-//        }
-//        return null;
-//      }
 
       // This version of this method is added in API level 23
 			@Override
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-				// Log.i(className, "override onReceivedError");
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-					// Toast.makeText(getActivity(), "WebView Error" + error.getDescription(), Toast.LENGTH_SHORT).show();
-					Log.e(className, "onReceivedError: WebView(Client) error - " + error.getDescription()
-							+ " code; " + String.valueOf(error.getErrorCode()) + " URL; " + request.getUrl().toString());
-				}
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					if ("net::".contentEquals(error.getDescription().subSequence(0,5))) {
-						if (error.getErrorCode() == WebViewClient.ERROR_TOO_MANY_REQUESTS || error.getErrorCode() == WebViewClient.ERROR_REDIRECT_LOOP) {
-							// escalate since app will freeze with these errors
-							super.onReceivedError(view, request, error);
-						} else {
-							// ignore other network errors
-							// super.onReceivedError(view, request, error);
-						}
-					} else {
-						Log.e(className, "===>>> onReceivedError Reloading WebView !!!");
-						// super.onReceivedError(view, request, error);
-						view.reload();
+					boolean mainFrame = request.isForMainFrame();
+					Log.e(className, "onReceivedError: WebView(Client) error - " + error.getDescription()
+							+ " code; " + error.getErrorCode()
+							+ " mainFrame; " + mainFrame
+							+ " URL; " + request.getUrl());
+					if (mainFrame) {
+						handleMainFrameLoadFailure(view, request.getUrl() != null
+								? request.getUrl().toString() : "");
+						return;
 					}
 				}
 			}
 			// This version of this method is deprecated from API version 23
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-				// Log.i(className, "override onReceivedError");
-				// Toast.makeText(getActivity(), "WebView Error" + description(), Toast.LENGTH_SHORT).show();
-				Log.e(className, "onReceivedError: WebView(Client) error - " + description + " code; " + String.valueOf(errorCode) + " URL; " + failingUrl);
-				if ("net::".contentEquals(description.subSequence(0,5))) {
-					if (errorCode == WebViewClient.ERROR_TOO_MANY_REQUESTS || errorCode == WebViewClient.ERROR_REDIRECT_LOOP) {
-						// escalate since app will freeze with these errors
-						super.onReceivedError(view, errorCode, description, failingUrl);
-					} else {
-						// ignore other network errors
-						// super.onReceivedError(view, errorCode, description, failingUrl);
-					}
-				} else {
-					Log.e(className, "===>>> onReceivedError Reloading WebView !!!");
-					// super.onReceivedError(view, errorCode, description, failingUrl);
-					view.reload();
-				}
+				Log.e(className, "onReceivedError: WebView(Client) error - " + description
+						+ " code; " + errorCode + " URL; " + failingUrl);
+				handleMainFrameLoadFailure(view, failingUrl);
 			}
 
 			@Override
 			public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
 				Log.i(className, "override onReceivedHttpError");
 				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					// Toast.makeText(getActivity(), "WebView Error" + errorResponse.getReasonPhrase(), Toast.LENGTH_SHORT).show();
 					Log.e(className, "onReceivedHttpError WebView http error: " + errorResponse.getReasonPhrase()
-							+ " URL: " + request.getUrl().toString());
+							+ " URL: " + request.getUrl().toString()
+							+ " mainFrame; " + request.isForMainFrame());
+					if (request.isForMainFrame()) {
+						handleMainFrameLoadFailure(view, request.getUrl().toString());
+						return;
+					}
 				}
 				super.onReceivedHttpError(view, request, errorResponse);
 			}
@@ -990,6 +976,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
 				Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
 						+ " priority=" + detail.rendererPriorityAtExit());
+				cancelLoaderStuckWatch();
 				MainActivity activity = MainActivity.this;
 				activity.runOnUiThread(() -> {
 					if (!activity.isFinishing()) {
@@ -1002,6 +989,63 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 		};
 	};
+
+	private static boolean isPlayerContentUrl(String url) {
+		return url != null && url.contains(PLAYER_HOST);
+	}
+
+	private static boolean isLoaderUrl(String url) {
+		return url != null && (url.contains("playr_loader.html")
+				|| url.contains("appassets.androidplatform.net"));
+	}
+
+	private void armLoaderStuckWatch() {
+		if (loaderWatchHandler == null) {
+			loaderWatchHandler = new Handler(Looper.getMainLooper());
+		}
+		cancelLoaderStuckWatch();
+		loaderStuckRunner = () -> {
+			if (isFinishing() || playbackContentLoaded) {
+				return;
+			}
+			Log.e(className, "loader stuck: play.playr.biz not loaded within "
+					+ LOADER_STUCK_TIMEOUT_MS + " ms; recovering");
+			if (AppRestarter.scheduleDelayedBackgroundRestart(
+					getApplicationContext(), false, "loader_stuck")) {
+				finish();
+			} else {
+				// Backoff blocked auto-restart: reload the local loader in-place.
+				recreateBrowserView();
+			}
+		};
+		loaderWatchHandler.postDelayed(loaderStuckRunner, LOADER_STUCK_TIMEOUT_MS);
+	}
+
+	private void cancelLoaderStuckWatch() {
+		if (loaderWatchHandler != null && loaderStuckRunner != null) {
+			loaderWatchHandler.removeCallbacks(loaderStuckRunner);
+			loaderStuckRunner = null;
+		}
+	}
+
+	private void handleMainFrameLoadFailure(WebView view, String failingUrl) {
+		Log.e(className, "handleMainFrameLoadFailure: " + failingUrl);
+		if (isPlayerContentUrl(failingUrl) || isLoaderUrl(failingUrl) || failingUrl == null || failingUrl.isEmpty()) {
+			playbackContentLoaded = false;
+			runOnUiThread(() -> {
+				if (isFinishing()) {
+					return;
+				}
+				if (view != null) {
+					String loaderUrl = LOCAL_ASSET_BASE + pageUrl(
+							retrieveOrGeneratePlayerId(),
+							view.getSettings().getUserAgentString());
+					Log.e(className, "handleMainFrameLoadFailure: reloading loader " + loaderUrl);
+					view.loadUrl(loaderUrl);
+				}
+			});
+		}
+	}
 
 	// We use the ActivityManager.MemoryInfo.threshold: The threshold of availMem at which we consider
 	// memory to be low and start killing background services and other non-extraneous processes.
@@ -1270,6 +1314,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (heartbeatHandler != null && heartbeatRunner != null) {
 			heartbeatHandler.removeCallbacks(heartbeatRunner);
 		}
+		cancelLoaderStuckWatch();
 	}
 
 	private Date getActivityCreatedAt() {

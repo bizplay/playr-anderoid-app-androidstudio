@@ -22,6 +22,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Out-of-process watchdog ({@code :watchdog}). Survives native crashes in the main WebView
@@ -45,12 +47,19 @@ public class PlayerWatchdogService extends Service {
 
 	private final Handler handler = new Handler(Looper.getMainLooper());
 	private final Runnable checkTask = this::runChecks;
+	private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "playr-watchdog-net");
+		t.setDaemon(true);
+		return t;
+	});
 
 	private volatile long lastHeartbeatMs;
 	private volatile long lastServerPollMs;
 	private volatile long lastRestartAttemptMs;
+	private volatile long monitoringSinceMs;
 	private volatile boolean monitoringEnabled;
 	private volatile long stableHeartbeatSinceMs;
+	private volatile boolean serverPollInFlight;
 	private String playerId = "";
 
 	@Override
@@ -67,6 +76,7 @@ public class PlayerWatchdogService extends Service {
 			monitoringEnabled = false;
 			lastHeartbeatMs = 0;
 			stableHeartbeatSinceMs = 0;
+			monitoringSinceMs = 0;
 			Log.i(className, ".onStartCommand: monitoring disabled");
 			return START_STICKY;
 		}
@@ -86,6 +96,7 @@ public class PlayerWatchdogService extends Service {
 			lastHeartbeatMs = now;
 			if (!monitoringEnabled) {
 				monitoringEnabled = true;
+				monitoringSinceMs = now;
 				stableHeartbeatSinceMs = now;
 				Log.i(className, ".onStartCommand: heartbeat re-enabled monitoring");
 			}
@@ -95,12 +106,26 @@ public class PlayerWatchdogService extends Service {
 			return START_STICKY;
 		}
 
-		// ACTION_ENABLE or initial start
+		if (ACTION_ENABLE.equals(action)) {
+			long now = System.currentTimeMillis();
+			monitoringEnabled = true;
+			lastHeartbeatMs = now;
+			monitoringSinceMs = now;
+			stableHeartbeatSinceMs = now;
+			Log.i(className, ".onStartCommand: monitoring enabled, playerId="
+					+ (playerId.isEmpty() ? "empty" : "***" + playerId.substring(Math.max(0, playerId.length() - 6))));
+			ensureForeground();
+			scheduleChecks();
+			return START_STICKY;
+		}
+
+		// Sticky restart after process death (null intent / no action): keep monitoring but do
+		// not pretend a heartbeat arrived. A real HEARTBEAT from MainActivity refreshes the clock.
 		monitoringEnabled = true;
-		lastHeartbeatMs = System.currentTimeMillis();
-		stableHeartbeatSinceMs = lastHeartbeatMs;
-		Log.i(className, ".onStartCommand: monitoring enabled, playerId="
-				+ (playerId.isEmpty() ? "empty" : "***" + playerId.substring(Math.max(0, playerId.length() - 6))));
+		if (monitoringSinceMs == 0L) {
+			monitoringSinceMs = System.currentTimeMillis();
+		}
+		Log.i(className, ".onStartCommand: sticky/recreate resume, lastHeartbeatMs=" + lastHeartbeatMs);
 		ensureForeground();
 		scheduleChecks();
 		return START_STICKY;
@@ -109,6 +134,7 @@ public class PlayerWatchdogService extends Service {
 	@Override
 	public void onDestroy() {
 		handler.removeCallbacks(checkTask);
+		networkExecutor.shutdownNow();
 		super.onDestroy();
 	}
 
@@ -153,9 +179,10 @@ public class PlayerWatchdogService extends Service {
 			return;
 		}
 
-		if (lastHeartbeatMs > 0 && now - lastHeartbeatMs > HEARTBEAT_STALE_MS) {
+		long heartbeatReferenceMs = lastHeartbeatMs > 0L ? lastHeartbeatMs : monitoringSinceMs;
+		if (heartbeatReferenceMs > 0L && now - heartbeatReferenceMs > HEARTBEAT_STALE_MS) {
 			Log.e(className, ".runChecks: heartbeat stale ("
-					+ (now - lastHeartbeatMs) + " ms), requesting player restart");
+					+ (now - heartbeatReferenceMs) + " ms), requesting player restart");
 			stableHeartbeatSinceMs = 0;
 			requestPlayerRestart(false, "watchdog_stale_heartbeat");
 			scheduleChecks();
@@ -163,14 +190,42 @@ public class PlayerWatchdogService extends Service {
 		}
 
 		if (now - lastServerPollMs >= SERVER_POLL_INTERVAL_MS) {
-			lastServerPollMs = now;
-			if (checkServerForRestart()) {
-				Log.i(className, ".runChecks: server commanded restart");
-				requestPlayerRestart(true, "watchdog_server_command");
-			}
+			pollServerForRestartAsync();
 		}
 
 		scheduleChecks();
+	}
+
+	private void pollServerForRestartAsync() {
+		if (serverPollInFlight) {
+			return;
+		}
+		if (playerId.isEmpty()) {
+			playerId = readStoredPlayerId();
+		}
+		if (playerId.isEmpty()) {
+			return;
+		}
+
+		serverPollInFlight = true;
+		lastServerPollMs = System.currentTimeMillis();
+		final String id = playerId;
+		networkExecutor.execute(() -> {
+			boolean reboot = false;
+			try {
+				reboot = checkServerForRestart(id);
+			} catch (RuntimeException ex) {
+				Log.e(className, ".pollServerForRestartAsync: unexpected error", ex);
+			} finally {
+				serverPollInFlight = false;
+			}
+			if (reboot) {
+				handler.post(() -> {
+					Log.i(className, ".runChecks: server commanded restart");
+					requestPlayerRestart(true, "watchdog_server_command");
+				});
+			}
+		});
 	}
 
 	private void requestPlayerRestart(boolean force, String reason) {
@@ -201,19 +256,12 @@ public class PlayerWatchdogService extends Service {
 		}
 	}
 
-	private boolean checkServerForRestart() {
-		if (playerId.isEmpty()) {
-			playerId = readStoredPlayerId();
-		}
-		if (playerId.isEmpty()) {
-			return false;
-		}
-
+	private boolean checkServerForRestart(String id) {
 		String response = "";
 		HttpURLConnection urlConnection = null;
 		InputStream inputStream = null;
 		try {
-			URL url = new URL("https://ajax.playr.biz/watchdogs/" + playerId + "/command");
+			URL url = new URL("https://ajax.playr.biz/watchdogs/" + id + "/command");
 			Log.i(className, ".checkServerForRestart URL: " + url);
 			urlConnection = (HttpURLConnection) url.openConnection();
 			urlConnection.setConnectTimeout(15_000);
@@ -251,7 +299,8 @@ public class PlayerWatchdogService extends Service {
 	}
 
 	private String readStoredPlayerId() {
-		SharedPreferences prefs = getSharedPreferences(MainActivity.class.getName(), MODE_PRIVATE);
+		// Activity.getPreferences() stores under the local class name ("MainActivity").
+		SharedPreferences prefs = getSharedPreferences("MainActivity", MODE_PRIVATE);
 		return prefs.getString(getString(R.string.player_id_store), "");
 	}
 
