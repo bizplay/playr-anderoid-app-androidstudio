@@ -934,6 +934,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				if (isPlayerContentUrl(url)) {
 					playbackContentLoaded = true;
 					cancelLoaderStuckWatch();
+					videoFaultMonitor.onContentReady();
 					injectVideoFaultHooks(view);
 				}
 				super.onPageFinished(view, url);
@@ -1019,8 +1020,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (view == null) {
 			return;
 		}
-		// MediaCodec failures often surface as <video> error / stalled play() rather than a
-		// Java exception. Hook element errors and report them into VideoPlaybackFaultMonitor.
+		// MediaCodec buffer failures surface as <video> error code 3 (MEDIA_ERR_DECODE).
+		// Do not hook 'stalled' — that fires during normal buffering on slow networks.
 		String js = "(function(){"
 				+ "if(window.__playrVideoFaultHooks) return;"
 				+ "window.__playrVideoFaultHooks=true;"
@@ -1029,8 +1030,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				+ "function bind(v){if(!v||v.__playrBound)return;v.__playrBound=true;"
 				+ "v.addEventListener('error',function(){"
 				+ "var c=(v.error&&v.error.code)||'?';"
-				+ "report('video_element_error:'+c);},true);"
-				+ "v.addEventListener('stalled',function(){report('video_stalled');},true);}"
+				+ "report('video_element_error:'+c);},true);}"
 				+ "document.addEventListener('error',function(ev){"
 				+ "if(ev&&ev.target&&ev.target.tagName==='VIDEO')bind(ev.target);"
 				+ "},true);"
@@ -1056,7 +1056,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				if (!playbackContentLoaded || isFinishing()) {
 					return;
 				}
-				videoFaultMonitor.recordFault(detail == null ? "js_bridge" : detail);
+				videoFaultMonitor.considerJsBridgeFault(detail == null ? "js_bridge" : detail);
 			});
 		}
 	}
