@@ -45,6 +45,7 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -82,13 +83,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final long HEARTBEAT_INTERVAL_MS = PlayerWatchdogService.CHECK_INTERVAL_MS;
 	/** If play.playr.biz has not loaded by then, treat the local loader as stuck and recover. */
 	private static final long LOADER_STUCK_TIMEOUT_MS = 60_000L;
-	private static final String PLAYER_HOST = "play.playr.biz";
+	private static final String PLAYER_HOST_PLAY = "play.playr.biz";
+	private static final String PLAYER_HOST_WWW = "www.playr.biz";
 	private Handler heartbeatHandler = null;
 	private Runnable heartbeatRunner = null;
 	private boolean continueHeartbeat = false;
 	private Handler loaderWatchHandler = null;
 	private Runnable loaderStuckRunner = null;
 	private boolean playbackContentLoaded = false;
+	private final VideoPlaybackFaultMonitor videoFaultMonitor =
+			new VideoPlaybackFaultMonitor(this::onVideoPlaybackFaultsExceeded);
 	// TWA related
 	// private boolean chromeVersionChecked = false;
 	private boolean twaWasLaunched = false;
@@ -810,6 +814,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		WebView result = new CustomWebView(this);
 		Log.i(className, "openWebView; webView is " + (result == null ? "null" : "not null"));
 		setupWebView(result);
+		result.addJavascriptInterface(new PlayrJavascriptBridge(), "PlayrAndroid");
 		result.setWebChromeClient(createWebChromeClient());
 		result.setWebViewClient(createWebViewClient());
 		result.setKeepScreenOn(true);
@@ -822,6 +827,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 		if (initialiseWebContent) {
 			playbackContentLoaded = false;
+			videoFaultMonitor.reset();
 			String loaderUrl = LOCAL_ASSET_BASE + pageUrl(playerId, result.getSettings().getUserAgentString());
 			Log.i(className, "openWebView: loadUrl " + loaderUrl);
 			result.loadUrl(loaderUrl);
@@ -871,9 +877,14 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+				String message = consoleMessage.message();
 				Log.i(className, "console." + consoleMessage.messageLevel()
 						+ " [" + consoleMessage.sourceId() + ":" + consoleMessage.lineNumber() + "] "
-						+ consoleMessage.message());
+						+ message);
+				if (playbackContentLoaded
+						&& consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+					videoFaultMonitor.considerConsoleMessage(message);
+				}
 				return true;
 			}
 		};
@@ -923,6 +934,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				if (isPlayerContentUrl(url)) {
 					playbackContentLoaded = true;
 					cancelLoaderStuckWatch();
+					injectVideoFaultHooks(view);
 				}
 				super.onPageFinished(view, url);
 			}
@@ -991,12 +1003,76 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	};
 
 	private static boolean isPlayerContentUrl(String url) {
-		return url != null && url.contains(PLAYER_HOST);
+		if (url == null) {
+			return false;
+		}
+		// play.playr.biz redirects into the channel UI on www.playr.biz
+		return url.contains(PLAYER_HOST_PLAY) || url.contains(PLAYER_HOST_WWW);
 	}
 
 	private static boolean isLoaderUrl(String url) {
 		return url != null && (url.contains("playr_loader.html")
 				|| url.contains("appassets.androidplatform.net"));
+	}
+
+	private void injectVideoFaultHooks(WebView view) {
+		if (view == null) {
+			return;
+		}
+		// MediaCodec failures often surface as <video> error / stalled play() rather than a
+		// Java exception. Hook element errors and report them into VideoPlaybackFaultMonitor.
+		String js = "(function(){"
+				+ "if(window.__playrVideoFaultHooks) return;"
+				+ "window.__playrVideoFaultHooks=true;"
+				+ "function report(d){try{if(window.PlayrAndroid&&PlayrAndroid.onVideoPlaybackFault)"
+				+ "PlayrAndroid.onVideoPlaybackFault(String(d));}catch(e){}}"
+				+ "function bind(v){if(!v||v.__playrBound)return;v.__playrBound=true;"
+				+ "v.addEventListener('error',function(){"
+				+ "var c=(v.error&&v.error.code)||'?';"
+				+ "report('video_element_error:'+c);},true);"
+				+ "v.addEventListener('stalled',function(){report('video_stalled');},true);}"
+				+ "document.addEventListener('error',function(ev){"
+				+ "if(ev&&ev.target&&ev.target.tagName==='VIDEO')bind(ev.target);"
+				+ "},true);"
+				+ "var list=document.getElementsByTagName('video');"
+				+ "for(var i=0;i<list.length;i++)bind(list[i]);"
+				+ "if(window.MutationObserver){"
+				+ "new MutationObserver(function(muts){for(var i=0;i<muts.length;i++){"
+				+ "var nodes=muts[i].addedNodes;for(var j=0;j<nodes.length;j++){"
+				+ "var n=nodes[j];if(!n||n.nodeType!==1)continue;"
+				+ "if(n.tagName==='VIDEO')bind(n);"
+				+ "var inner=n.getElementsByTagName?n.getElementsByTagName('video'):[];"
+				+ "for(var k=0;k<inner.length;k++)bind(inner[k]);"
+				+ "}}}).observe(document.documentElement||document.body,"
+				+ "{childList:true,subtree:true});}"
+				+ "})();";
+		view.evaluateJavascript(js, null);
+	}
+
+	private final class PlayrJavascriptBridge {
+		@JavascriptInterface
+		public void onVideoPlaybackFault(String detail) {
+			runOnUiThread(() -> {
+				if (!playbackContentLoaded || isFinishing()) {
+					return;
+				}
+				videoFaultMonitor.recordFault(detail == null ? "js_bridge" : detail);
+			});
+		}
+	}
+
+	private void onVideoPlaybackFaultsExceeded(String lastDetail) {
+		if (isFinishing()) {
+			return;
+		}
+		Log.e(className, "onVideoPlaybackFaultsExceeded: " + lastDetail);
+		if (AppRestarter.scheduleDelayedBackgroundRestart(
+				getApplicationContext(), false, "video_playback_fault")) {
+			finish();
+		} else {
+			videoFaultMonitor.reset();
+			recreateBrowserView();
+		}
 	}
 
 	private void armLoaderStuckWatch() {
