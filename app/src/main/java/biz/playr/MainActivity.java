@@ -158,6 +158,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		AppRestarter.clearRestartPending();
 		AppRestarter.clearRestartScheduledMark(this);
 		AppRestarter.cancelAlarmClockLaunch(this);
+		RestartBackoff.logOperatorStatus(this);
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes
 		Log.i(className, "onCreate: setDefaultUncaughtExceptionHandler");
@@ -419,7 +420,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				PlayerWatchdogClient.disableMonitoring(getApplicationContext());
 			}
 			Log.i(className, "onStop: activity is finishing, scheduling delayed restart");
-			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
+			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false, "activity_finish");
 		}
 		super.onStop();
 		Log.i(className, "onStop: end");
@@ -457,7 +458,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Skip configuration changes so rotation does not restart-loop.
 		if (!isChangingConfigurations()) {
 			Log.i(className, "onDestroy: scheduling delayed background restart if needed");
-			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false);
+			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false, "activity_destroy");
 		} else {
 			Log.i(className, "onDestroy: configuration change, not scheduling delayed restart");
 		}
@@ -993,7 +994,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				activity.runOnUiThread(() -> {
 					if (!activity.isFinishing()) {
 						AppRestarter.scheduleDelayedBackgroundRestart(
-								activity.getApplicationContext(), false);
+								activity.getApplicationContext(), false, "webview_renderer_gone");
 						activity.finish();
 					}
 				});
@@ -1257,6 +1258,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			}
 		};
 		heartbeatHandler.postDelayed(heartbeatRunner, HEARTBEAT_INTERVAL_MS);
+		heartbeatHandler.postDelayed(() -> {
+			if (continueHeartbeat) {
+				RestartBackoff.resetAfterStableSession(getApplicationContext());
+			}
+		}, RestartBackoff.STABLE_SESSION_MS);
 	}
 
 	private void stopWatchdogHeartbeat() {

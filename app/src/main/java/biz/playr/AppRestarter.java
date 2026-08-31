@@ -225,6 +225,10 @@ final class AppRestarter {
 		if (!shouldRestart(context, force)) {
 			return false;
 		}
+		if (!RestartBackoff.canRestart(context, force)) {
+			RestartBackoff.logRestartBlocked(context, "java_crash");
+			return false;
+		}
 		if (!tryMarkRestartPending()) {
 			Log.i(className, ".restartAfterUncaughtException: restart already pending, skipping");
 			return false;
@@ -234,6 +238,7 @@ final class AppRestarter {
 			Log.i(className, ".restartAfterUncaughtException: scheduling alarm restart");
 			if (scheduleAlarmRestart(context)) {
 				markRestartScheduled(context);
+				RestartBackoff.recordAttempt(context, "java_crash", force);
 				return true;
 			}
 			return false;
@@ -242,6 +247,7 @@ final class AppRestarter {
 		Log.i(className, ".restartAfterUncaughtException: immediate relaunch");
 		context.getApplicationContext().startActivity(createRestartActivityIntent(context));
 		markRestartScheduled(context);
+		RestartBackoff.recordAttempt(context, "java_crash", force);
 		return true;
 	}
 
@@ -269,8 +275,16 @@ final class AppRestarter {
 	 * activity start. Pre-Q keeps AlarmManager, which was not subject to BAL.
 	 */
 	static boolean scheduleDelayedBackgroundRestart(Context context, boolean force) {
+		return scheduleDelayedBackgroundRestart(context, force, "unspecified");
+	}
+
+	static boolean scheduleDelayedBackgroundRestart(Context context, boolean force, String reason) {
 		if (!shouldRestart(context, force)) {
 			Log.i(className, ".scheduleDelayedBackgroundRestart: restart disabled for this build");
+			return false;
+		}
+		if (!RestartBackoff.canRestart(context, force)) {
+			RestartBackoff.logRestartBlocked(context, reason);
 			return false;
 		}
 		if (!tryMarkRestartPending()) {
@@ -280,18 +294,20 @@ final class AppRestarter {
 
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 			Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
-					+ RESTART_DELAY_MS + " ms");
+					+ RESTART_DELAY_MS + " ms, reason=" + reason);
 			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
 				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service");
 				clearRestartPending();
 				return false;
 			}
 			markRestartScheduled(context);
+			RestartBackoff.recordAttempt(context, reason, force);
 			return true;
 		}
 
 		if (scheduleAlarmRestart(context)) {
 			markRestartScheduled(context);
+			RestartBackoff.recordAttempt(context, reason, force);
 			return true;
 		}
 		return false;

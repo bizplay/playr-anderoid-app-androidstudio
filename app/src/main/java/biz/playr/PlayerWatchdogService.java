@@ -50,6 +50,7 @@ public class PlayerWatchdogService extends Service {
 	private volatile long lastServerPollMs;
 	private volatile long lastRestartAttemptMs;
 	private volatile boolean monitoringEnabled;
+	private volatile long stableHeartbeatSinceMs;
 	private String playerId = "";
 
 	@Override
@@ -65,6 +66,7 @@ public class PlayerWatchdogService extends Service {
 		if (ACTION_DISABLE.equals(action)) {
 			monitoringEnabled = false;
 			lastHeartbeatMs = 0;
+			stableHeartbeatSinceMs = 0;
 			Log.i(className, ".onStartCommand: monitoring disabled");
 			return START_STICKY;
 		}
@@ -80,11 +82,14 @@ public class PlayerWatchdogService extends Service {
 		}
 
 		if (ACTION_HEARTBEAT.equals(action)) {
-			lastHeartbeatMs = System.currentTimeMillis();
+			long now = System.currentTimeMillis();
+			lastHeartbeatMs = now;
 			if (!monitoringEnabled) {
 				monitoringEnabled = true;
+				stableHeartbeatSinceMs = now;
 				Log.i(className, ".onStartCommand: heartbeat re-enabled monitoring");
 			}
+			maybeResetBackoffAfterStableSession(now);
 			ensureForeground();
 			scheduleChecks();
 			return START_STICKY;
@@ -93,6 +98,7 @@ public class PlayerWatchdogService extends Service {
 		// ACTION_ENABLE or initial start
 		monitoringEnabled = true;
 		lastHeartbeatMs = System.currentTimeMillis();
+		stableHeartbeatSinceMs = lastHeartbeatMs;
 		Log.i(className, ".onStartCommand: monitoring enabled, playerId="
 				+ (playerId.isEmpty() ? "empty" : "***" + playerId.substring(Math.max(0, playerId.length() - 6))));
 		ensureForeground();
@@ -150,7 +156,8 @@ public class PlayerWatchdogService extends Service {
 		if (lastHeartbeatMs > 0 && now - lastHeartbeatMs > HEARTBEAT_STALE_MS) {
 			Log.e(className, ".runChecks: heartbeat stale ("
 					+ (now - lastHeartbeatMs) + " ms), requesting player restart");
-			requestPlayerRestart(false);
+			stableHeartbeatSinceMs = 0;
+			requestPlayerRestart(false, "watchdog_stale_heartbeat");
 			scheduleChecks();
 			return;
 		}
@@ -159,24 +166,38 @@ public class PlayerWatchdogService extends Service {
 			lastServerPollMs = now;
 			if (checkServerForRestart()) {
 				Log.i(className, ".runChecks: server commanded restart");
-				requestPlayerRestart(true);
+				requestPlayerRestart(true, "watchdog_server_command");
 			}
 		}
 
 		scheduleChecks();
 	}
 
-	private void requestPlayerRestart(boolean force) {
+	private void requestPlayerRestart(boolean force, String reason) {
 		long now = System.currentTimeMillis();
 		if (!force && now - lastRestartAttemptMs < MIN_RESTART_INTERVAL_MS) {
 			Log.i(className, ".requestPlayerRestart: throttled");
 			return;
 		}
 		lastRestartAttemptMs = now;
-		if (AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), force)) {
-			Log.i(className, ".requestPlayerRestart: scheduled relaunch (force=" + force + ")");
+		if (AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), force, reason)) {
+			Log.i(className, ".requestPlayerRestart: scheduled relaunch (force=" + force + ", reason=" + reason + ")");
+			stableHeartbeatSinceMs = 0;
 		} else {
-			Log.e(className, ".requestPlayerRestart: schedule failed (force=" + force + ")");
+			Log.e(className, ".requestPlayerRestart: schedule failed (force=" + force + ", reason=" + reason + ")");
+			ensureForeground();
+		}
+	}
+
+	private void maybeResetBackoffAfterStableSession(long now) {
+		if (stableHeartbeatSinceMs <= 0) {
+			stableHeartbeatSinceMs = now;
+			return;
+		}
+		if (now - stableHeartbeatSinceMs >= RestartBackoff.STABLE_SESSION_MS) {
+			RestartBackoff.resetAfterStableSession(this);
+			stableHeartbeatSinceMs = now;
+			ensureForeground();
 		}
 	}
 
@@ -253,8 +274,13 @@ public class PlayerWatchdogService extends Service {
 		Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 				? new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
 				: new Notification.Builder(this);
+		String contentText = getString(R.string.watchdog_notification_text);
+		String backoffSummary = RestartBackoff.notificationSummary(this);
+		if (backoffSummary != null) {
+			contentText = backoffSummary;
+		}
 		builder.setContentTitle(getString(R.string.watchdog_notification_title))
-				.setContentText(getString(R.string.watchdog_notification_text))
+				.setContentText(contentText)
 				.setSmallIcon(R.drawable.ic_launcher)
 				.setOngoing(true);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
