@@ -847,14 +847,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+				WebViewNetworkLog.logConsole(className, consoleMessage);
 				String message = consoleMessage.message();
-				Log.i(className, "console." + consoleMessage.messageLevel()
-						+ " [" + consoleMessage.sourceId() + ":" + consoleMessage.lineNumber() + "] "
-						+ message);
 				if (playbackContentLoaded
-						&& consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+						&& consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
+						&& WebViewNetworkLog.classifyConsole(message)
+								== WebViewNetworkLog.Category.UNEXPECTED) {
 					boolean result = videoFaultMonitor.considerConsoleMessage(message);
-					if (!result) { Log.e(className, "videoFaultMonitor.considerConsoleMessage returned error"); }
+					if (!result) {
+						Log.e(className, "videoFaultMonitor.considerConsoleMessage returned error");
+					}
 				}
 				return true;
 			}
@@ -922,34 +924,31 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 					boolean mainFrame = request.isForMainFrame();
-					Log.e(className, "onReceivedError: WebView(Client) error - " + error.getDescription()
-							+ " code; " + error.getErrorCode()
-							+ " mainFrame; " + mainFrame
-							+ " URL; " + request.getUrl());
+					String url = request.getUrl() != null ? request.getUrl().toString() : "";
+					WebViewNetworkLog.logNetworkError(className, mainFrame, error.getErrorCode(),
+							error.getDescription(), url);
 					if (mainFrame) {
-						handleMainFrameLoadFailure(view, request.getUrl() != null
-								? request.getUrl().toString() : "");
-						return;
+						handleMainFrameLoadFailure(view, url);
 					}
 				}
 			}
 			// This version of this method is deprecated from API version 23
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-				Log.e(className, "onReceivedError: WebView(Client) error - " + description
-						+ " code; " + errorCode + " URL; " + failingUrl);
+				WebViewNetworkLog.logNetworkError(className, true, errorCode, description, failingUrl);
 				handleMainFrameLoadFailure(view, failingUrl);
 			}
 
 			@Override
 			public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-				Log.i(className, "override onReceivedHttpError");
-				if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					Log.e(className, "onReceivedHttpError WebView http error: " + errorResponse.getReasonPhrase()
-							+ " URL: " + request.getUrl().toString()
-							+ " mainFrame; " + request.isForMainFrame());
-					if (request.isForMainFrame()) {
-						handleMainFrameLoadFailure(view, request.getUrl().toString());
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					boolean mainFrame = request.isForMainFrame();
+					String url = request.getUrl() != null ? request.getUrl().toString() : "";
+					int statusCode = errorResponse != null ? errorResponse.getStatusCode() : -1;
+					String reason = errorResponse != null ? errorResponse.getReasonPhrase() : "";
+					WebViewNetworkLog.logHttpError(className, mainFrame, statusCode, reason, url);
+					if (mainFrame) {
+						handleMainFrameLoadFailure(view, url);
 						return;
 					}
 				}
