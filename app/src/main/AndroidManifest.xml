@@ -129,10 +129,6 @@
 			</intent-filter>
 		</activity>
 		<service
-			android:name="biz.playr.CheckRestartService"
-			android:exported="false"
-			android:enabled="true"/>
-		<service
 			android:name="biz.playr.PlayerWatchdogService"
 			android:exported="false"
 			android:enabled="true"
@@ -151,18 +147,6 @@
 				android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
 				android:value="Relaunch Playr after boot or after the player UI is closed on unattended displays"/>
 		</service>
-		<!--
-		<service
-			android:name="biz.playr.CheckRestartService"
-			android:exported="false"
-			android:label="@string/watchdog_name"
-			android:persistent="true"
-			android:isolatedProcess="true"
-			android:process=":CheckRestartService"
-			android:enabled="true"/>
-
-		<service android:name="biz.playr.PlayrService"/>
-		 -->
 		<!--
 		<service android:name="biz.playr.PersistService" android:enabled="true"/>
 		 -->
