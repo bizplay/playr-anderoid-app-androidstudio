@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Looper;
 import android.provider.Settings;
@@ -22,11 +23,18 @@ final class AppRestarter {
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
 	private static final String RESTART_COORDINATION_PREFS = "playr_restart_coordination";
 	private static final String KEY_RESTART_SCHEDULED_AT = "scheduled_at";
+	private static final String KEY_RESTART_PENDING_AT = "pending_at";
 
 	// Short delay so onDestroy can finish tearing down the WebView, while the foreground service
 	// still has launch privileges. The historical 30s wait was for Android 3/4 resource cleanup
 	// and is no longer needed.
 	static final long RESTART_DELAY_MS = 2000;
+
+	/** Shared across processes; in-memory {@link #restartPending} alone stuck the watchdog JVM. */
+	private static final long RESTART_PENDING_EXPIRE_MS = 60_000L;
+
+	/** Watchdog may force-clear coordination when the player has been down this long. */
+	static final long RESTART_COORDINATION_FORCE_CLEAR_MS = 5 * 60_000L;
 
 	private static volatile boolean restartPending = false;
 
@@ -37,8 +45,43 @@ final class AppRestarter {
 		return restartPending;
 	}
 
-	static void clearRestartPending() {
+	static void clearRestartPending(Context context) {
 		restartPending = false;
+		context.getApplicationContext()
+				.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+				.edit()
+				.remove(KEY_RESTART_PENDING_AT)
+				.commit();
+	}
+
+	/**
+	 * Clears restart coordination that outlived a failed relaunch. Used when the watchdog sees
+	 * a heartbeat stale well beyond normal restart timing.
+	 */
+	static void clearStaleRestartCoordination(Context context, long heartbeatStaleMs, String reason) {
+		if (heartbeatStaleMs < RESTART_COORDINATION_FORCE_CLEAR_MS) {
+			return;
+		}
+		Context app = context.getApplicationContext();
+		SharedPreferences prefs = app.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE);
+		long pendingAt = prefs.getLong(KEY_RESTART_PENDING_AT, 0L);
+		long scheduledAt = prefs.getLong(KEY_RESTART_SCHEDULED_AT, 0L);
+		long now = System.currentTimeMillis();
+		boolean stalePending = pendingAt > 0 && now - pendingAt >= RESTART_PENDING_EXPIRE_MS;
+		boolean staleScheduled = scheduledAt > 0 && now - scheduledAt >= RESTART_PENDING_EXPIRE_MS;
+		if (!restartPending && !stalePending && !staleScheduled) {
+			return;
+		}
+		clearRestartPending(context);
+		if (staleScheduled) {
+			clearRestartScheduledMark(context);
+		}
+		Log.e(className, ".\n"
+				+ "********************************************************************************\n"
+				+ "*** RESTART COORDINATION: force-cleared stale pending/schedule marks\n"
+				+ "*** reason: " + reason + "\n"
+				+ "*** heartbeatStaleMs: " + heartbeatStaleMs + "\n"
+				+ "********************************************************************************\n.");
 	}
 
 	/** Shared across processes so {@link PlayerWatchdogService} does not double-schedule a relaunch. */
@@ -198,7 +241,7 @@ final class AppRestarter {
 		if (!shouldRestart(activity, force)) {
 			return false;
 		}
-		if (!tryMarkRestartPending()) {
+		if (!tryMarkRestartPending(activity)) {
 			Log.i(className, ".restartImmediateRecreate: restart already pending, skipping");
 			return false;
 		}
@@ -209,7 +252,7 @@ final class AppRestarter {
 				activity.recreate();
 			} catch (RuntimeException ex) {
 				Log.e(className, ".restartImmediateRecreate: recreate failed, relaunching activity", ex);
-				clearRestartPending();
+				clearRestartPending(activity);
 				restartImmediateRelaunch(activity, force);
 			}
 		});
@@ -229,7 +272,7 @@ final class AppRestarter {
 			RestartBackoff.logRestartBlocked(context, "java_crash");
 			return false;
 		}
-		if (!tryMarkRestartPending()) {
+		if (!tryMarkRestartPending(context)) {
 			Log.i(className, ".restartAfterUncaughtException: restart already pending, skipping");
 			return false;
 		}
@@ -241,6 +284,7 @@ final class AppRestarter {
 				RestartBackoff.recordAttempt(context, "java_crash", force);
 				return true;
 			}
+			clearRestartPending(context);
 			return false;
 		}
 
@@ -259,7 +303,7 @@ final class AppRestarter {
 		if (!shouldRestart(context, force)) {
 			return false;
 		}
-		if (!tryMarkRestartPending()) {
+		if (!tryMarkRestartPending(context)) {
 			Log.i(className, ".restartImmediateRelaunch: restart already pending, skipping");
 			return false;
 		}
@@ -287,7 +331,7 @@ final class AppRestarter {
 			RestartBackoff.logRestartBlocked(context, reason);
 			return false;
 		}
-		if (!tryMarkRestartPending()) {
+		if (!tryMarkRestartPending(context)) {
 			Log.i(className, ".scheduleDelayedBackgroundRestart: restart already pending, skipping");
 			return false;
 		}
@@ -297,7 +341,7 @@ final class AppRestarter {
 					+ RESTART_DELAY_MS + " ms, reason=" + reason);
 			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
 				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service");
-				clearRestartPending();
+				clearRestartPending(context);
 				return false;
 			}
 			markRestartScheduled(context);
@@ -310,6 +354,7 @@ final class AppRestarter {
 			RestartBackoff.recordAttempt(context, reason, force);
 			return true;
 		}
+		clearRestartPending(context);
 		return false;
 	}
 
@@ -323,7 +368,7 @@ final class AppRestarter {
 		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 		if (alarmManager == null) {
 			Log.e(className, ".scheduleAlarmRestart: AlarmManager unavailable");
-			clearRestartPending();
+			clearRestartPending(context);
 			return false;
 		}
 
@@ -333,7 +378,7 @@ final class AppRestarter {
 			alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, launchPendingIntent);
 		} catch (SecurityException ex) {
 			Log.e(className, ".scheduleAlarmRestart: alarm scheduling failed", ex);
-			clearRestartPending();
+			clearRestartPending(context);
 			return false;
 		}
 		return true;
@@ -343,11 +388,23 @@ final class AppRestarter {
 		return context.getResources().getBoolean(R.bool.restart) || force;
 	}
 
-	private static boolean tryMarkRestartPending() {
+	private static boolean tryMarkRestartPending(Context context) {
 		synchronized (AppRestarter.class) {
-			if (restartPending) {
+			Context app = context.getApplicationContext();
+			long now = System.currentTimeMillis();
+			long pendingAt = app.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+					.getLong(KEY_RESTART_PENDING_AT, 0L);
+			if (pendingAt > 0 && now - pendingAt < RESTART_PENDING_EXPIRE_MS) {
 				return false;
 			}
+			if (pendingAt > 0) {
+				Log.w(className, ".tryMarkRestartPending: expired stale pending mark (age="
+						+ (now - pendingAt) + " ms), allowing new restart");
+			}
+			app.getSharedPreferences(RESTART_COORDINATION_PREFS, Context.MODE_PRIVATE)
+					.edit()
+					.putLong(KEY_RESTART_PENDING_AT, now)
+					.commit();
 			restartPending = true;
 			return true;
 		}

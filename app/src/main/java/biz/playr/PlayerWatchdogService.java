@@ -234,6 +234,11 @@ public class PlayerWatchdogService extends Service {
 			Log.i(className, ".requestPlayerRestart: throttled");
 			return;
 		}
+		long heartbeatReferenceMs = lastHeartbeatMs > 0L ? lastHeartbeatMs : monitoringSinceMs;
+		long heartbeatStaleMs = heartbeatReferenceMs > 0L ? now - heartbeatReferenceMs : 0L;
+		if (!force && heartbeatStaleMs >= AppRestarter.RESTART_COORDINATION_FORCE_CLEAR_MS) {
+			AppRestarter.clearStaleRestartCoordination(getApplicationContext(), heartbeatStaleMs, reason);
+		}
 		lastRestartAttemptMs = now;
 		if (AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), force, reason)) {
 			Log.i(className, ".requestPlayerRestart: scheduled relaunch (force=" + force + ", reason=" + reason + ")");
