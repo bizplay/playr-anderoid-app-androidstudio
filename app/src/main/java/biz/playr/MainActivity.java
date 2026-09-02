@@ -80,6 +80,9 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private boolean continueMemoryCheck = true;
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
+	private static final long MEMORY_RECOVERY_COOLDOWN_MS = 3 * 60 * 1000L;
+	private long lastMemoryRecoveryAtMs = 0L;
+	private MemoryStatus lastMemoryRecoveryStatus = MemoryStatus.OK;
 	private static final long HEARTBEAT_INTERVAL_MS = PlayerWatchdogService.CHECK_INTERVAL_MS;
 	/** If play.playr.biz has not loaded by then, treat the local loader as stuck and recover. */
 	private static final long LOADER_STUCK_TIMEOUT_MS = 60_000L;
@@ -316,44 +319,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	public void onTrimMemory(int level) {
 		Log.i(className, "override onTrimMemory");
 		super.onTrimMemory(level);
-		MemoryStatus memoryStatus = analyseMemoryStatus();
+		MemoryStatus memoryStatus = analyseMemoryStatus(level);
 		Log.e(className, ".\n********************************************************************************\n*** onTrimMemory - level: " + level + "\n*** memory status: " + memoryStatus + "\n********************************************************************************\n.");
 
-		// Determine which lifecycle or system event was raised.
-		switch (level) {
-			case ComponentCallbacks2.TRIM_MEMORY_BACKGROUND:
-			case ComponentCallbacks2.TRIM_MEMORY_MODERATE:
-			case ComponentCallbacks2.TRIM_MEMORY_COMPLETE:
-				// Release as much memory as the process can.
-			case ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN:
-				// while testing it turned out that moments after available
-				// memory was at 112% of threshold (in VM) the highest level
-				// reported was TRIM_MEMORY_RUNNING_CRITICAL
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL:
-				// Release any UI objects that currently hold memory.
-				// The user interface has moved to the background.
-				// ==>> restart the application
-				// this.restartActivity();
-				freeMemoryWhenNeeded(memoryStatus);
-				break;
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW:
-				// ==>> dump browser view and recreate it
-				// this.recreateBrowserView();
-				freeMemoryWhenNeeded(memoryStatus);
-				break;
-			case ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE:
-				// ==>> reload browser view
-				// this.reloadBrowserView();
-				freeMemoryWhenNeeded(memoryStatus);
-				break;
-			default:
-				// Release any non-critical data structures.
-				//
-				// The app received an unrecognized memory level value
-				// from the system. Treat this as a generic low-memory message.
-				// ==>> reload browser view
-				Log.e(className, "onTrimMemory - Non standard level detected: " + level);
-				break;
+		if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE) {
+			freeMemoryWhenNeeded(memoryStatus);
 		}
 	}
 	// end of implementation ComponentCallbacks2
@@ -788,7 +758,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		continueMemoryCheck = true;
 
 		memoryCheckRunner = () -> {
-			freeMemoryWhenNeeded(analyseMemoryStatus());
+			freeMemoryWhenNeeded(analyseMemoryStatus(MemoryPressureEvaluator.TRIM_NONE));
 			if (continueMemoryCheck) {
 				// run again
 				memoryCheckHandler.postDelayed(memoryCheckRunner, interval);
@@ -1132,66 +1102,69 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	// MemoryStatus.MEDIUM   if available memory <= 125% and > 115% of threshold
 	// MemoryStatus.LOW      if available memory <= 115% and > 105% of threshold
 	// memoryStatus.CRITICAL if available memory <= 105%of threshold
-	private MemoryStatus analyseMemoryStatus() {
-		MemoryStatus result = MemoryStatus.OK;
-
+	private MemoryStatus analyseMemoryStatus(int trimLevel) {
 		Log.i(className, "analyseMemoryStatus");
-		// Find out how much memory is available; availMem, totalMem, threshold and lowMemory are available as values
 		ActivityManager.MemoryInfo memoryInfo = getAvailableMemory();
 		Runtime runtime = Runtime.getRuntime();
 		long availableHeapSizeInMB = (runtime.maxMemory()/MB) - ((runtime.totalMemory() - runtime.freeMemory())/MB);
-		result = calculateMemoryStatus(memoryInfo.availMem, memoryInfo.threshold);
+		long initialAvailMem = this.firstMemoryInfo != null ? this.firstMemoryInfo.availMem : 0L;
+		MemoryStatus result = MemoryPressureEvaluator.evaluate(memoryInfo, initialAvailMem, trimLevel);
+		String pressureDetail = MemoryPressureEvaluator.describe(
+				memoryInfo, initialAvailMem, trimLevel, result);
 		Log.e(className, ".\n********************************************************************************\n" +
 				"*** total memory: " + memoryInfo.totalMem/MB + " MB\n" +
-				"*** available memory: " + memoryInfo.availMem/MB + " (" + this.firstMemoryInfo.availMem/MB + ", " + (memoryInfo.availMem - this.firstMemoryInfo.availMem)/MB + ") [MB]\n" +
-				"*** used memory: " + (memoryInfo.totalMem - memoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - memoryInfo.availMem)*100/memoryInfo.totalMem + "%] (initially: " + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - this.firstMemoryInfo.availMem)*100/memoryInfo.totalMem + "%])\n" +
+				"*** available memory: " + memoryInfo.availMem/MB + " (" + initialAvailMem/MB + ", " + (memoryInfo.availMem - initialAvailMem)/MB + ") [MB]\n" +
+				"*** used memory: " + (memoryInfo.totalMem - memoryInfo.availMem)/MB + " MB [" + (memoryInfo.totalMem - memoryInfo.availMem)*100/memoryInfo.totalMem + "%] (initially: " + (memoryInfo.totalMem - initialAvailMem)/MB + " MB [" + (memoryInfo.totalMem - initialAvailMem)*100/memoryInfo.totalMem + "%])\n" +
 				"*** threshold: " + memoryInfo.threshold/MB + " MB\n" +
-				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
+				"*** low memory?: " + memoryInfo.lowMemory + " (" + (this.firstMemoryInfo != null ? this.firstMemoryInfo.lowMemory : false) + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
-				"********************************************************************************\n" +
-				"*** available memory: " + Math.round((float) (100 * memoryInfo.availMem) /this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round((float) (100 * memoryInfo.availMem) /memoryInfo.threshold) + "% of threshold\n*** => result: " + result  + "\n" +
+				"*** pressure: " + pressureDetail + "\n" +
 				"********************************************************************************\n.");
 		return result;
 	}
 
-	private MemoryStatus calculateMemoryStatus(long availableMemory, long threshold) {
-		MemoryStatus result = MemoryStatus.OK;
-		if (availableMemory > 1.25*threshold) {
-			result = MemoryStatus.OK;
-		} else if (availableMemory <= 1.25*threshold && availableMemory > 1.15*threshold) {
-			result = MemoryStatus.MEDIUM;
-		} else if (availableMemory <= 1.15*threshold && availableMemory > 1.05*threshold) {
-			result = MemoryStatus.LOW;
-		} else { // availableMemory <= 1.05*threshold
-			result = MemoryStatus.CRITICAL;
-		}
-		return result;
-	}
-
 	private void freeMemoryWhenNeeded(MemoryStatus status) {
+		if (status == MemoryStatus.OK || isFinishing()) {
+			return;
+		}
+		if (shouldSkipMemoryRecovery(status)) {
+			Log.i(className, ".freeMemoryWhenNeeded: " + status + " recovery throttled (cooldown)");
+			return;
+		}
+		recordMemoryRecovery(status);
 		switch (status) {
 			case CRITICAL:
-				// Release as much memory as the process can.
-				// ==>> restart the activity
-				Log.i(className, ".freeMemoryWhenNeeded; CRITICAL => restartActivity");
-				this.restartActivity();
+				Log.e(className, ".freeMemoryWhenNeeded: CRITICAL => scheduled restart (memory_pressure)");
+				if (AppRestarter.scheduleDelayedBackgroundRestart(
+						getApplicationContext(), false, "memory_pressure")) {
+					finish();
+				} else {
+					restartActivity();
+				}
 				break;
 			case LOW:
-				// Release any UI objects that currently hold memory.
-				// ==>> dump browser view and recreate it
-				Log.i(className, ".freeMemoryWhenNeeded; LOW => recreateBrowserView");
-				this.recreateBrowserView();
-			case MEDIUM:
-				// Release any memory that your app doesn't need to run.
-				// ==>> reload browser view
-				Log.i(className, ".freeMemoryWhenNeeded; MEDIUM => reloadBrowserView");
-				this.reloadBrowserView();
+				Log.i(className, ".freeMemoryWhenNeeded: LOW => recreateBrowserView");
+				recreateBrowserView();
 				break;
-			case OK:
+			case MEDIUM:
+				Log.i(className, ".freeMemoryWhenNeeded: MEDIUM => reloadBrowserView");
+				reloadBrowserView();
+				break;
 			default:
-				// no action needs to be taken
 				break;
 		}
+	}
+
+	private boolean shouldSkipMemoryRecovery(MemoryStatus requested) {
+		if (requested.ordinal() > lastMemoryRecoveryStatus.ordinal()) {
+			return false;
+		}
+		return System.currentTimeMillis() - lastMemoryRecoveryAtMs < MEMORY_RECOVERY_COOLDOWN_MS;
+	}
+
+	private void recordMemoryRecovery(MemoryStatus status) {
+		lastMemoryRecoveryAtMs = System.currentTimeMillis();
+		lastMemoryRecoveryStatus = status;
 	}
 
 	private HashMap<String, String> versionInfo() {
