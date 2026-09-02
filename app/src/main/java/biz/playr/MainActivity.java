@@ -118,11 +118,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (activity == null || activity.isFinishing()) {
 			return false;
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) {
-			return false;
-		}
-		return true;
-	}
+    return !activity.isDestroyed();
+  }
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -230,7 +227,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 						retrieveOrGeneratePlayerId());
 		// API 33+ way to handle back button
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-			getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, backPressedHandler());
+			getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, Objects.requireNonNull(backPressedHandler()));
 		}
 
 		startWatchdogHeartbeat();
@@ -627,8 +624,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private String permissionStatus(String permission) {
-		return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
-	}
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
+    }
+		return "unknown (API < 24)";
+  }
 
 	private String notificationsStatus() {
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
@@ -883,7 +883,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 						+ message);
 				if (playbackContentLoaded
 						&& consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-					videoFaultMonitor.considerConsoleMessage(message);
+					boolean result = videoFaultMonitor.considerConsoleMessage(message);
+					if (!result) { Log.e(className, "videoFaultMonitor.considerConsoleMessage returned error"); }
 				}
 				return true;
 			}
@@ -987,9 +988,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-				Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
-						+ " priority=" + detail.rendererPriorityAtExit());
-				cancelLoaderStuckWatch();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
+              + " priority=" + detail.rendererPriorityAtExit());
+        }
+        cancelLoaderStuckWatch();
 				MainActivity activity = MainActivity.this;
 				activity.runOnUiThread(() -> {
 					if (!activity.isFinishing()) {
@@ -1146,7 +1149,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				"*** low memory?: " + memoryInfo.lowMemory + " (" + this.firstMemoryInfo.lowMemory + ")\n" +
 				"*** available heap size: " + availableHeapSizeInMB + " (" + this.firstAvailableHeapSizeInMB + ", " + (availableHeapSizeInMB - this.firstAvailableHeapSizeInMB) + ") [MB]\n" +
 				"********************************************************************************\n" +
-				"*** available memory: " + Math.round(100*memoryInfo.availMem/this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round(100*memoryInfo.availMem/memoryInfo.threshold) + "% of threshold\n*** => result: " + result  + "\n" +
+				"*** available memory: " + Math.round((float) (100 * memoryInfo.availMem) /this.firstMemoryInfo.availMem) + "% of initial available, " + Math.round((float) (100 * memoryInfo.availMem) /memoryInfo.threshold) + "% of threshold\n*** => result: " + result  + "\n" +
 				"********************************************************************************\n.");
 		return result;
 	}
@@ -1250,7 +1253,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
 			// bars are visible => user touched the screen, make the bars disappear again in 2 seconds
 			Handler handler = new Handler(Looper.getMainLooper());
-			handler.postDelayed(() -> hideBars(), 2000);
+			handler.postDelayed(this::hideBars, 2000);
 		} else {
 			// The system bars are NOT visible => do nothing
 		}

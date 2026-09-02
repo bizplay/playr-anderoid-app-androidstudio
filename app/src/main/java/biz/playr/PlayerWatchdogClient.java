@@ -9,7 +9,7 @@ import android.util.Log;
  * Sends intents to {@link PlayerWatchdogService} in the {@code :watchdog} process.
  */
 final class PlayerWatchdogClient {
-	private static final String className = BuildConfig.APP_NAMESPACE + ".WatchdogClient";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".WatchdogClien";
 
 	private PlayerWatchdogClient() {
 	}

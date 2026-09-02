@@ -35,7 +35,7 @@ public class PlayerWatchdogService extends Service {
 	static final String ACTION_DISABLE = BuildConfig.APP_NAMESPACE + ".watchdog.DISABLE";
 	static final String EXTRA_PLAYER_ID = "player_id";
 
-	private static final String className = BuildConfig.APP_NAMESPACE + ".PlayerWatchdog";
+	private static final String className = BuildConfig.APP_NAMESPACE + ".PlayerWatchdo";
 	private static final String NOTIFICATION_CHANNEL_ID = "playr_watchdog";
 	private static final int NOTIFICATION_ID = 1002;
 	private static final String REBOOT_RESPONSE = "1";

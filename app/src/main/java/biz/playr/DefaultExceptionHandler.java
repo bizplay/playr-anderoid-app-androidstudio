@@ -45,8 +45,8 @@ class DefaultExceptionHandler implements UncaughtExceptionHandler {
 			}
 
 			if (getActivity().getApplicationContext().getResources().getBoolean(R.bool.restart)) {
-				AppRestarter.restartAfterUncaughtException(getActivity(), false);
-				Log.e(className, "uncaughtException: activity.finish() !!! About to restart application !!!");
+				boolean result = AppRestarter.restartAfterUncaughtException(getActivity(), false);
+				Log.e(className, "uncaughtException: activity.finish() !!! About to restart application !!! (result: " + result + ")");
 				getActivity().finish();
 				defaultUEH.uncaughtException(thread, ex);
 			} else {
