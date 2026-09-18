@@ -62,7 +62,7 @@ android {
         applicationId = appManifest.applicationId
         versionCode = appManifest.versionCode
         versionName = appManifest.versionName
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 37
 
         // The name for the application on the Android Launcher
@@ -196,7 +196,8 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.cardview:cardview:1.0.0'
     // version 1.14.0 is the latest version that supports SDK version 21
-    implementation 'androidx.webkit:webkit:1.14.0'
+    // implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'androidx.webkit:webkit:1.17.0'
     // version 1.9.0 is the latest version that supports SDK version 21
     // implementation 'androidx.browser:browser:1.9.0'
     implementation 'androidx.preference:preference:1.2.1'
@@ -206,7 +207,8 @@ dependencies {
     // in the build.gradle in the /gradle folder to enable
     // inclusion of code from GitHub)
     // version 1.7.1 is the latest version that supports SDK version 21
-    implementation 'androidx.appcompat:appcompat:1.7.1'
+    // implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.appcompat:appcompat:1.8.0'
 //    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
 //    implementation 'com.google.android.material:material:1.1.0'
 //    testImplementation 'junit:junit:4.12'
