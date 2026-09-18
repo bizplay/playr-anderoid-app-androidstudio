@@ -1,5 +1,6 @@
 package biz.playr;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -13,6 +14,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+
+import java.util.List;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -41,6 +44,8 @@ public class PlayerWatchdogService extends Service {
 	private static final String REBOOT_RESPONSE = "1";
 
 	static final long CHECK_INTERVAL_MS = 30_000L;
+	/** Faster first check after sticky recreate / orphaned HEARTBEAT (LMK recovery). */
+	static final long QUICK_CHECK_DELAY_MS = 5_000L;
 	static final long HEARTBEAT_STALE_MS = 90_000L;
 	static final long SERVER_POLL_INTERVAL_MS = 180_000L;
 	static final long MIN_RESTART_INTERVAL_MS = 30_000L;
@@ -92,6 +97,15 @@ public class PlayerWatchdogService extends Service {
 		}
 
 		if (ACTION_HEARTBEAT.equals(action)) {
+			// A HEARTBEAT Intent can still be delivered after LMK kills the UI process (queued
+			// startService). Do not refresh the clock unless the main process is actually alive.
+			if (!isMainPlayerProcessAlive()) {
+				Log.w(className, ".onStartCommand: ignoring HEARTBEAT; main process not running");
+				monitoringEnabled = true;
+				ensureForeground();
+				scheduleChecks(QUICK_CHECK_DELAY_MS);
+				return START_STICKY;
+			}
 			long now = System.currentTimeMillis();
 			lastHeartbeatMs = now;
 			if (!monitoringEnabled) {
@@ -127,7 +141,8 @@ public class PlayerWatchdogService extends Service {
 		}
 		Log.i(className, ".onStartCommand: sticky/recreate resume, lastHeartbeatMs=" + lastHeartbeatMs);
 		ensureForeground();
-		scheduleChecks();
+		// Main may already be gone (LMK of fg TOP); check soon instead of waiting a full interval.
+		scheduleChecks(QUICK_CHECK_DELAY_MS);
 		return START_STICKY;
 	}
 
@@ -163,8 +178,12 @@ public class PlayerWatchdogService extends Service {
 	}
 
 	private void scheduleChecks() {
+		scheduleChecks(CHECK_INTERVAL_MS);
+	}
+
+	private void scheduleChecks(long delayMs) {
 		handler.removeCallbacks(checkTask);
-		handler.postDelayed(checkTask, CHECK_INTERVAL_MS);
+		handler.postDelayed(checkTask, delayMs);
 	}
 
 	private void runChecks() {
@@ -176,6 +195,17 @@ public class PlayerWatchdogService extends Service {
 		if (AppRestarter.wasRestartScheduledRecently(this, HEARTBEAT_STALE_MS)) {
 			Log.i(className, ".runChecks: restart already scheduled recently, skip");
 			scheduleChecks();
+			return;
+		}
+
+		// LMK can kill the fg UI process with signal 9 while :watchdog survives. Heartbeat
+		// alone is too slow (and can be falsely refreshed by queued Intents). Detect absence
+		// of the default process and relaunch promptly.
+		if (!isMainPlayerProcessAlive()) {
+			Log.e(className, ".runChecks: main player process not running, requesting restart");
+			stableHeartbeatSinceMs = 0;
+			requestPlayerRestart(false, "watchdog_main_process_dead");
+			scheduleChecks(QUICK_CHECK_DELAY_MS);
 			return;
 		}
 
@@ -194,6 +224,33 @@ public class PlayerWatchdogService extends Service {
 		}
 
 		scheduleChecks();
+	}
+
+	/**
+	 * True when the default package process ({@code biz.playr}, not {@code :watchdog}) is alive.
+	 * Used to detect LMK / native kills of the UI process independently of heartbeats.
+	 */
+	private boolean isMainPlayerProcessAlive() {
+		ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+		if (activityManager == null) {
+			return true;
+		}
+		String mainProcessName = getPackageName();
+		try {
+			List<ActivityManager.RunningAppProcessInfo> processes = activityManager.getRunningAppProcesses();
+			if (processes == null) {
+				return true;
+			}
+			for (ActivityManager.RunningAppProcessInfo info : processes) {
+				if (mainProcessName.equals(info.processName)) {
+					return true;
+				}
+			}
+			return false;
+		} catch (RuntimeException ex) {
+			Log.w(className, ".isMainPlayerProcessAlive: query failed, assuming alive", ex);
+			return true;
+		}
 	}
 
 	private void pollServerForRestartAsync() {
