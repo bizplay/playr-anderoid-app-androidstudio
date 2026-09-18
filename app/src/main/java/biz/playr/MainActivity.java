@@ -26,6 +26,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.Manifest;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -103,6 +104,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final int SESSION_ID = 96375;
 	private static final String TWA_WAS_LAUNCHED_KEY = "android.support.customtabs.trusted.TWA_WAS_LAUNCHED_KEY";
 	private static final int REQUEST_OVERLAY_PERMISSION = 1;
+	private static final int REQUEST_LOCAL_NETWORK_PERMISSION = 2;
 	// Load packaged HTML via a real https origin. file:// + XHR to the internet is
 	// blocked on Android 11+ (allowUniversalAccessFromFileURLs is ignored when targeting API 30+).
 	// https://developer.android.com/reference/androidx/webkit/WebViewAssetLoader
@@ -222,6 +224,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 		// request overlay permission needed for 'auto start' ability
 		requestManageOverlayPermission(getApplicationContext());
+		// API 37+: restore LAN access that INTERNET previously implied (playlist/media on LAN).
+		requestLocalNetworkPermissionIfNeeded();
 
 		// create Trusted Web Access or fall back to a WebView
 		openBrowserView((savedInstanceState == null),
@@ -260,8 +264,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				// Permission request was denied.
 				Log.e(className, "onRequestPermissionsResult: REQUEST_OVERLAY_PERMISSION - overlay permission NOT granted! permission: " + permissions[0]);
 			}
-		} else {
-			// nothing currently
+		} else if (requestCode == REQUEST_LOCAL_NETWORK_PERMISSION) {
+			if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				Log.i(className, "onRequestPermissionsResult: ACCESS_LOCAL_NETWORK granted");
+			} else {
+				Log.e(className, "onRequestPermissionsResult: ACCESS_LOCAL_NETWORK denied"
+						+ " (LAN/private-IP WebView traffic will be blocked on API 37+;"
+						+ " grant via Settings or adb shell pm grant "
+						+ getPackageName() + " android.permission.ACCESS_LOCAL_NETWORK)");
+			}
 		}
 	}
 
@@ -561,6 +572,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.e(className, "***                                                                          ***");
 		Log.e(className, "***               INTERNET: " + paddedOut(permissionStatus("android.permission.INTERNET"), 49) + "***");
 		Log.e(className, "***   ACCESS_NETWORK_STATE: " + paddedOut(permissionStatus("android.permission.ACCESS_NETWORK_STATE"), 49) + "***");
+		Log.e(className, "***   ACCESS_LOCAL_NETWORK: " + paddedOut(localNetworkPermissionStatus(), 49) + "***");
 		Log.e(className, "*** RECEIVE_BOOT_COMPLETED: " + paddedOut(permissionStatus("android.permission.RECEIVE_BOOT_COMPLETED"), 49) + "***");
 		Log.e(className, "***              WAKE_LOCK: " + paddedOut(permissionStatus("android.permission.WAKE_LOCK"), 49) + "***");
 		Log.e(className, "***     FOREGROUND_SERVICE: " + paddedOut(permissionStatus("android.permission.FOREGROUND_SERVICE"), 49) + "***");
@@ -814,6 +826,30 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.i(className, "requestManageOverlayPermission: overlay granted="
 					+ Settings.canDrawOverlays(context));
 		}
+	}
+
+	private void requestLocalNetworkPermissionIfNeeded() {
+		// Targeting API 37 blocks LAN/private-IP traffic unless ACCESS_LOCAL_NETWORK is granted.
+		// Cloud HTTPS (play.playr.biz) is unaffected; this restores parity for LAN media URLs.
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) {
+			return;
+		}
+		if (checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK)
+				== PackageManager.PERMISSION_GRANTED) {
+			Log.i(className, "requestLocalNetworkPermissionIfNeeded: already granted");
+			return;
+		}
+		Log.i(className, "requestLocalNetworkPermissionIfNeeded: requesting ACCESS_LOCAL_NETWORK");
+		requestPermissions(
+				new String[]{Manifest.permission.ACCESS_LOCAL_NETWORK},
+				REQUEST_LOCAL_NETWORK_PERMISSION);
+	}
+
+	private String localNetworkPermissionStatus() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.CINNAMON_BUN) {
+			return "not required (API < 37)";
+		}
+		return permissionStatus(Manifest.permission.ACCESS_LOCAL_NETWORK);
 	}
 
 	private boolean isAndroidTV() {

@@ -44,6 +44,10 @@
 	<uses-permission android:name="android.permission.INTERNET"/>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+	<!-- Required when targeting API 37+: LAN/WebView private-IP access is no longer
+	     implied by INTERNET. Declare so operators can grant via Settings/ADB/MDM;
+	     MainActivity requests it at runtime on API 37+. -->
+	<uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK"/>
 	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 	<!--<uses-permission android:name="android.permission.GET_TASKS"/>-->
 	<!-- WAKE_LOCK is used by the media player inside WebView/Chromium -->
@@ -70,6 +74,7 @@
 		android:banner="@drawable/banner"
 		android:label="@string/app_name"
 		android:usesCleartextTraffic="true"
+		android:enableOnBackInvokedCallback="true"
 		android:theme="@style/AppTheme" >
 		<!-- as alternative to singleInstance
 		<activity android:launchMode = "singleTask"/>

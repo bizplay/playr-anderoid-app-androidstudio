@@ -195,10 +195,15 @@ public class RestartForegroundService extends Service {
 	@SuppressWarnings("deprecation")
 	private ActivityOptions createBackgroundStartOptions() {
 		ActivityOptions options = ActivityOptions.makeBasic();
+		// API 36+: ALLOW_ALWAYS is the supported strong opt-in for FGS / PendingIntent /
+		// IntentSender launches when the UI is not visible (unattended restart).
+		// MODE_BACKGROUND_ACTIVITY_START_ALLOWED is deprecated and ineffective when
+		// targeting API 37+ (Android 17 BAL / IntentSender hardening).
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
 			options.setPendingIntentBackgroundActivityStartMode(
 					ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
 		} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+			// API 34–35 only expose the legacy ALLOWED / DENIED / SYSTEM_DEFINED modes.
 			options.setPendingIntentBackgroundActivityStartMode(
 					ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
 		}
