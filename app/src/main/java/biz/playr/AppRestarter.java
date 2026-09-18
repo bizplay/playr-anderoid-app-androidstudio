@@ -147,7 +147,7 @@ final class AppRestarter {
 	 * (BAL_BLOCK). Overlay is the remaining exemption the device honours.
 	 */
 	static boolean hasOverlayLaunchExemption(Context context) {
-		return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
+		return Settings.canDrawOverlays(context);
 	}
 
 	static void logBackgroundLaunchPrivileges(Context context) {

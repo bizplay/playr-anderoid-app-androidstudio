@@ -62,7 +62,7 @@ android {
         applicationId = appManifest.applicationId
         versionCode = appManifest.versionCode
         versionName = appManifest.versionName
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 37
 
         // The name for the application on the Android Launcher
@@ -198,9 +198,9 @@ dependencies {
     // version 1.14.0 is the latest version that supports SDK version 21
     // implementation 'androidx.webkit:webkit:1.14.0'
     // version 1.15.0 is the latest version that supports SDK version 23
-    implementation 'androidx.webkit:webkit:1.15.0'
+    // implementation 'androidx.webkit:webkit:1.15.0'
     // version 1.16.0 requires SDK version 24
-    // implementation 'androidx.webkit:webkit:1.17.0'
+    implementation 'androidx.webkit:webkit:1.17.0'
     // version 1.9.0 is the latest version that supports SDK version 21
     // implementation 'androidx.browser:browser:1.9.0'
     implementation 'androidx.preference:preference:1.2.1'

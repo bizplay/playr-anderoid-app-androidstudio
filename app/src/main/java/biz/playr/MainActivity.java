@@ -477,19 +477,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
 			if (getWindow() != null) {
 				View decorView = getWindow().getDecorView();
-				// Hide both the navigation bar and the status bar.
-				// SYSTEM_UI_FLAG_FULLSCREEN is available from Android 4.1 (API 16) and higher, but as
-				// a general rule, you should design your app to hide the status bar whenever you
-				// hide the navigation bar.
-				// SYSTEM_UI_FLAG_HIDE_NAVIGATION is available from API level 14
-				// SYSTEM_UI_FLAG_IMMERSIVE_STICKY is available from API 18
+				// Hide both the navigation bar and the status bar (pre-R immersive flags).
 				int uiOptions =   View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 								| View.SYSTEM_UI_FLAG_FULLSCREEN
 								| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-				// Enables regular immersive mode.
-				// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
-				// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-				//				| View.SYSTEM_UI_FLAG_IMMERSIVE;
 				decorView.setSystemUiVisibility(uiOptions);
 			}
 		} else {
@@ -593,9 +584,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private String overlayStatus() {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-			return "not required (API < 23)";
-		}
 		return Settings.canDrawOverlays(this) ? "granted" : "denied";
 	}
 
@@ -607,16 +595,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private String permissionStatus(String permission) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
-    }
-		return "unknown (API < 24)";
-  }
+		return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
+	}
 
 	private String notificationsStatus() {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-			return "unknown (API < 24)";
-		}
 		NotificationManager notificationManager = getSystemService(NotificationManager.class);
 		if (notificationManager == null) {
 			return "unknown";
@@ -641,9 +623,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private String batteryOptimizationStatus() {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-			return "not required (API < 23)";
-		}
 		PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
 		if (powerManager == null) {
 			return "unknown";
@@ -657,13 +636,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 		if (connectivityManager == null) {
 			return "unknown";
-		}
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-			android.net.NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
-			if (networkInfo == null || !networkInfo.isConnected()) {
-				return "none";
-			}
-			return networkInfo.getTypeName();
 		}
 		Network network = connectivityManager.getActiveNetwork();
 		NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(network);
@@ -740,7 +712,7 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				Log.e(className, "openBrowserView webView is not null");
 			}
 			webView = openWebView(initialiseWebContent, playerId);
-			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
 				// prevent unintended 'focus' highlighting of the browser view
 				webView.setDefaultFocusHighlightEnabled(false);
 			}
@@ -824,10 +796,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// Overlay permission is a BAL exemption and a fallback for delayed restart on Android 10+.
 		// Do not open the system Settings screen automatically: dedicated players often have no
 		// usable input, and boot auto-start already works via BootUpReceiver.
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			Log.i(className, "requestManageOverlayPermission: overlay granted="
-					+ Settings.canDrawOverlays(context));
-		}
+		Log.i(className, "requestManageOverlayPermission: overlay granted="
+				+ Settings.canDrawOverlays(context));
 	}
 
 	private void requestLocalNetworkPermissionIfNeeded() {
@@ -956,20 +926,18 @@ public class MainActivity extends Activity implements IServiceCallbacks {
         return assetLoader.shouldInterceptRequest(request.getUrl());
       }
 
-      // This version of this method is added in API level 23
+      // API 23+ overload
 			@Override
 			public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					boolean mainFrame = request.isForMainFrame();
-					String url = request.getUrl() != null ? request.getUrl().toString() : "";
-					WebViewNetworkLog.logNetworkError(className, mainFrame, error.getErrorCode(),
-							error.getDescription(), url);
-					if (mainFrame) {
-						handleMainFrameLoadFailure(view, url);
-					}
+				boolean mainFrame = request.isForMainFrame();
+				String url = request.getUrl() != null ? request.getUrl().toString() : "";
+				WebViewNetworkLog.logNetworkError(className, mainFrame, error.getErrorCode(),
+						error.getDescription(), url);
+				if (mainFrame) {
+					handleMainFrameLoadFailure(view, url);
 				}
 			}
-			// This version of this method is deprecated from API version 23
+			// Deprecated overload (still delivered for some non-resource errors)
 			@Override
 			public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
 				WebViewNetworkLog.logNetworkError(className, true, errorCode, description, failingUrl);
@@ -978,27 +946,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 
 			@Override
 			public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-					boolean mainFrame = request.isForMainFrame();
-					String url = request.getUrl() != null ? request.getUrl().toString() : "";
-					int statusCode = errorResponse != null ? errorResponse.getStatusCode() : -1;
-					String reason = errorResponse != null ? errorResponse.getReasonPhrase() : "";
-					WebViewNetworkLog.logHttpError(className, mainFrame, statusCode, reason, url);
-					if (mainFrame) {
-						handleMainFrameLoadFailure(view, url);
-						return;
-					}
+				boolean mainFrame = request.isForMainFrame();
+				String url = request.getUrl() != null ? request.getUrl().toString() : "";
+				int statusCode = errorResponse != null ? errorResponse.getStatusCode() : -1;
+				String reason = errorResponse != null ? errorResponse.getReasonPhrase() : "";
+				WebViewNetworkLog.logHttpError(className, mainFrame, statusCode, reason, url);
+				if (mainFrame) {
+					handleMainFrameLoadFailure(view, url);
+					return;
 				}
 				super.onReceivedHttpError(view, request, errorResponse);
 			}
 
 			@Override
 			public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
-              + " priority=" + detail.rendererPriorityAtExit());
-        }
-        cancelLoaderStuckWatch();
+				Log.e(className, "onRenderProcessGone: didCrash=" + detail.didCrash()
+						+ " priority=" + detail.rendererPriorityAtExit());
+				cancelLoaderStuckWatch();
 				MainActivity activity = MainActivity.this;
 				activity.runOnUiThread(() -> {
 					if (!activity.isFinishing()) {
@@ -1258,13 +1222,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				versionCode = PackageInfoCompat.getLongVersionCode(pi);
 				result.put("webviewVersion", "Version-name: " + pi.versionName + ", -code: " + versionCode);
 			}
-			if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
 				pi2 = WebViewCompat.getCurrentWebViewPackage(MainActivity.this);
 				if (pi2 != null) {
 					versionCode = PackageInfoCompat.getLongVersionCode(pi2);
 					if (pi != null &&
 							result.get("webviewVersion") != null &&
-              !Objects.equals(result.get("webviewVersion"), "Version-name: " + pi2.versionName + ", -code: " + versionCode)) {
+							!Objects.equals(result.get("webviewVersion"), "Version-name: " + pi2.versionName + ", -code: " + versionCode)) {
 						result.put("webviewVersion", result.get("webviewVersion") + " | Version-name: " + pi2.versionName + ", -code: " + versionCode);
 					} else {
 						result.put("webviewVersion", "Version-name: " + pi2.versionName + ", -code: " + versionCode);
@@ -1345,7 +1309,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		if (webView != null) {
 			WebSettings webSettings = webView.getSettings();
 			webSettings.setJavaScriptEnabled(true);
-			// available for android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.JELLY_BEAN
 			webSettings.setMediaPlaybackRequiresUserGesture(false);
 			webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 			webSettings.setLoadWithOverviewMode(true);
@@ -1361,7 +1324,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
       webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
       webSettings.setSupportMultipleWindows(false);
       webSettings.setMediaPlaybackRequiresUserGesture(false);
-			// available for android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN
 			webSettings.setBuiltInZoomControls(false);
 			webSettings.setDisplayZoomControls(false);
 			webSettings.setSupportZoom(false);
@@ -1370,9 +1332,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			//webSettings.setDefaultFixedFontSize();
 			//webSettings.setDefaultFontSize();
 			//webSettings.setMinimumFontSize();
-			//webSettings.setMinimumLogicalFontSize();
-			// available for android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT
-			// webSettings.setPluginState(PluginState.ON);
+			//			webSettings.setMinimumLogicalFontSize();
+			// webSettings.setPluginState(PluginState.ON); // removed from the platform
 			// Caching of web content:
 			// When navigating back, content is not revalidated, instead the content is just retrieved
 			// from the cache. Disable the cache to fix this.
@@ -1551,7 +1512,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			// make sure to call mWebView.resumeTimers().
 			webView.pauseTimers();
 
-			// NOTE: This can occasionally cause a segfault below API 17 (4.2)
 			Log.i(className, "destroyWebView: webView.destroy()");
 			webView.destroy();
 		} else {
@@ -1569,16 +1529,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private boolean httpsRequired() {
-		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) {
-			// For Android version lower than 6 API level 23, https is not required
-			return false;
-		} if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
 			// For Android versions greater than or equal 9 API level 28, only https is allowed
 			// Since isCleartextTrafficPermitted() returns true on some devices running
 			// Android 9 or higher, no check is performed
 			return true;
-		} else {
-			return !NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted();
 		}
+		return !NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted();
 	}
 }

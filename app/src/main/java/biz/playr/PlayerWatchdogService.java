@@ -170,8 +170,6 @@ public class PlayerWatchdogService extends Service {
 				Log.e(className, ".ensureForeground: specialUse failed, retry without type", ex);
 				startForeground(NOTIFICATION_ID, notification);
 			}
-		} else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			startForeground(NOTIFICATION_ID, notification);
 		} else {
 			startForeground(NOTIFICATION_ID, notification);
 		}

@@ -142,22 +142,16 @@ public class RestartForegroundService extends Service {
 		} else {
 			Log.e(className, ".stopNow: MainActivity still not visible after launch attempts");
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-			stopForeground(STOP_FOREGROUND_REMOVE);
-		} else {
-			stopForeground(true);
-		}
+		stopForeground(STOP_FOREGROUND_REMOVE);
 		stopSelf();
 	}
 
 	private void startActivityWithBalOptIn(Intent activityIntent) {
 		try {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				Log.i(className, ".startActivityWithBalOptIn: overlay granted="
-						+ Settings.canDrawOverlays(this)
-						+ ", fullScreenIntent=" + AppRestarter.fullScreenIntentStatus(this)
-						+ ", exactAlarms=" + AppRestarter.exactAlarmStatus(this));
-			}
+			Log.i(className, ".startActivityWithBalOptIn: overlay granted="
+					+ Settings.canDrawOverlays(this)
+					+ ", fullScreenIntent=" + AppRestarter.fullScreenIntentStatus(this)
+					+ ", exactAlarms=" + AppRestarter.exactAlarmStatus(this));
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 				startActivity(activityIntent, createBackgroundStartOptions().toBundle());
 			} else {
@@ -172,12 +166,8 @@ public class RestartForegroundService extends Service {
 	private void sendRestartPendingIntent(Intent activityIntent) {
 		PendingIntent launchPendingIntent = launchPendingIntent(activityIntent);
 		try {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-				launchPendingIntent.send(this, 0, null, null, null, null,
-						createBackgroundStartOptions().toBundle());
-			} else {
-				launchPendingIntent.send();
-			}
+			launchPendingIntent.send(this, 0, null, null, null, null,
+					createBackgroundStartOptions().toBundle());
 			Log.i(className, ".sendRestartPendingIntent: PendingIntent sent");
 		} catch (PendingIntent.CanceledException | RuntimeException ex) {
 			Log.e(className, ".sendRestartPendingIntent: send failed", ex);
