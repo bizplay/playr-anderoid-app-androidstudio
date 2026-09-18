@@ -56,9 +56,10 @@
 	<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 	<!-- Overlay is a BAL exemption if an operator grants it (Settings or appops). -->
 	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-	<!-- setAlarmClock is a BAL exemption when the alarm fires (Android 10+). -->
-	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-	<uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+	<!-- Exact-alarm permissions (SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM) are intentionally omitted:
+	     Play Store restricts USE_EXACT_ALARM to alarm/calendar apps. Restarts use
+	     RestartForegroundService (API 29+), PlayerWatchdogService, BootUpReceiver, and
+	     inexact AlarmManager.set() on older APIs only. -->
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application

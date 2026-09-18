@@ -167,7 +167,6 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		storeActivityCreatedAt(); // Store activity status for possible use in the BootupReceiver
 		AppRestarter.clearRestartPending(this);
 		AppRestarter.clearRestartScheduledMark(this);
-		AppRestarter.cancelAlarmClockLaunch(this);
 		RestartBackoff.logOperatorStatus(this);
 		reportSystemInformation();
 		// Setup restarting of the app when it crashes

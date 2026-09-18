@@ -134,20 +134,17 @@ final class AppRestarter {
 	}
 
 	static String exactAlarmStatus(Context context) {
+		// Exact-alarm permissions are not declared (Play Store policy). Restarts use FGS /
+		// watchdog / boot, plus inexact AlarmManager.set() on API < 29 only.
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
 			return "not required (API < 31)";
 		}
-		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-		if (alarmManager == null) {
-			return "unknown";
-		}
-		return alarmManager.canScheduleExactAlarms() ? "granted" : "denied";
+		return "not requested (inexact/FGS restart path)";
 	}
 
 	/**
-	 * On Android 14 this TPV blocks FGS, PendingIntent, full-screen intent, and even
-	 * {@link AlarmManager#setAlarmClock} (BAL_BLOCK 102). Overlay is the remaining
-	 * exemption the device honours.
+	 * On Android 14 this TPV blocks FGS, PendingIntent, and full-screen intent
+	 * (BAL_BLOCK). Overlay is the remaining exemption the device honours.
 	 */
 	static boolean hasOverlayLaunchExemption(Context context) {
 		return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
@@ -164,30 +161,6 @@ final class AppRestarter {
 					+ " adb shell appops set " + context.getPackageName()
 					+ " SYSTEM_ALERT_WINDOW allow");
 		}
-	}
-
-	/**
-	 * Cancels a leftover {@link AlarmManager#setAlarmClock} relaunch. On cold power-on the
-	 * firmware already starts {@link MainActivity}; an alarm with {@code CLEAR_TASK} would
-	 * destroy that instance (BAL is allowed because the window is visible).
-	 */
-	static void cancelAlarmClockLaunch(Context context) {
-		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-		if (alarmManager == null) {
-			return;
-		}
-		PendingIntent launchPendingIntent = launchActivityPendingIntent(context);
-		alarmManager.cancel(launchPendingIntent);
-		launchPendingIntent.cancel();
-		Log.i(className, ".cancelAlarmClockLaunch: cancelled pending alarm-clock relaunch");
-	}
-
-	private static PendingIntent launchActivityPendingIntent(Context context) {
-		return PendingIntent.getActivity(
-				context.getApplicationContext(),
-				RESTART_PENDING_INTENT_REQUEST_CODE,
-				createRestartActivityIntent(context),
-				PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 	}
 
 	/**
@@ -216,8 +189,6 @@ final class AppRestarter {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 			logBackgroundLaunchPrivileges(context);
 			// Delay the FGS so firmware can start MainActivity first on a cold power-on.
-			// An alarm-clock relaunch must not run: on power-on the activity is already
-			// visible, so the alarm is BAL-allowed and CLEAR_TASK destroys the WebView.
 			Log.i(className, ".launchFromBoot: starting foreground service to launch MainActivity"
 					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart
 					+ ", exactAlarms=" + exactAlarmStatus(context)
