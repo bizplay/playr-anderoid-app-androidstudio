@@ -82,6 +82,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	private static final long MB = 1048576L;
 	private static final long memoryCheckInterval = 5*60*1000; // 5 minutes
 	private static final long MEMORY_RECOVERY_COOLDOWN_MS = 3 * 60 * 1000L;
+	/** Longer cooldown while playlist content is playing — avoid recreate storms under GPU/RAM pressure. */
+	private static final long MEMORY_RECOVERY_COOLDOWN_PLAYING_MS = 10 * 60 * 1000L;
 	private long lastMemoryRecoveryAtMs = 0L;
 	private MemoryStatus lastMemoryRecoveryStatus = MemoryStatus.OK;
 	private static final long HEARTBEAT_INTERVAL_MS = PlayerWatchdogService.CHECK_INTERVAL_MS;
@@ -1165,10 +1167,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 			Log.i(className, ".freeMemoryWhenNeeded: " + status + " recovery throttled (cooldown)");
 			return;
 		}
+		// Destroying/reloading the WebView while MediaCodec is decoding (especially 4K) frees
+		// surfaces mid-flight and often *increases* LMK risk on low-RAM devices (Shield ~2GB).
+		// Prefer soft reclamation while play.playr.biz content is loaded; keep hard recovery
+		// for the loader phase and for true Android low-memory + near-threshold cases.
+		boolean playing = playbackContentLoaded;
 		recordMemoryRecovery(status);
 		switch (status) {
 			case CRITICAL:
-				Log.e(className, ".freeMemoryWhenNeeded: CRITICAL => scheduled restart (memory_pressure)");
+				Log.e(className, ".freeMemoryWhenNeeded: CRITICAL => scheduled restart (memory_pressure)"
+						+ (playing ? " [playing]" : ""));
 				if (AppRestarter.scheduleDelayedBackgroundRestart(
 						getApplicationContext(), false, "memory_pressure")) {
 					finish();
@@ -1177,10 +1185,23 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				}
 				break;
 			case LOW:
-				Log.i(className, ".freeMemoryWhenNeeded: LOW => recreateBrowserView");
+				if (playing && !shouldHardRecoverWhilePlaying()) {
+					Log.i(className, ".freeMemoryWhenNeeded: LOW while playing => softFreeMemory"
+							+ " (skip recreateBrowserView)");
+					softFreeMemory("LOW_while_playing");
+					break;
+				}
+				Log.i(className, ".freeMemoryWhenNeeded: LOW => recreateBrowserView"
+						+ (playing ? " [playing+system lowMemory]" : ""));
 				recreateBrowserView();
 				break;
 			case MEDIUM:
+				if (playing) {
+					Log.i(className, ".freeMemoryWhenNeeded: MEDIUM while playing => softFreeMemory"
+							+ " (skip reloadBrowserView)");
+					softFreeMemory("MEDIUM_while_playing");
+					break;
+				}
 				Log.i(className, ".freeMemoryWhenNeeded: MEDIUM => reloadBrowserView");
 				reloadBrowserView();
 				break;
@@ -1189,11 +1210,33 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		}
 	}
 
+	/**
+	 * Hard WebView teardown while playing only when the platform itself reports low memory
+	 * and available RAM is near the LMK threshold — not for trim-only / %used heuristics.
+	 */
+	private boolean shouldHardRecoverWhilePlaying() {
+		ActivityManager.MemoryInfo info = getAvailableMemory();
+		if (info == null) {
+			return false;
+		}
+		boolean nearThreshold = info.threshold > 0L && info.availMem <= (long) (1.05 * info.threshold);
+		return info.lowMemory && nearThreshold;
+	}
+
+	private void softFreeMemory(String reason) {
+		Log.i(className, ".softFreeMemory: " + reason);
+		// Do not clear WebView cache/disk here — that forces re-fetch and more decoder churn.
+		Runtime.getRuntime().gc();
+	}
+
 	private boolean shouldSkipMemoryRecovery(MemoryStatus requested) {
 		if (requested.ordinal() > lastMemoryRecoveryStatus.ordinal()) {
 			return false;
 		}
-		return System.currentTimeMillis() - lastMemoryRecoveryAtMs < MEMORY_RECOVERY_COOLDOWN_MS;
+		long cooldown = playbackContentLoaded
+				? MEMORY_RECOVERY_COOLDOWN_PLAYING_MS
+				: MEMORY_RECOVERY_COOLDOWN_MS;
+		return System.currentTimeMillis() - lastMemoryRecoveryAtMs < cooldown;
 	}
 
 	private void recordMemoryRecovery(MemoryStatus status) {
