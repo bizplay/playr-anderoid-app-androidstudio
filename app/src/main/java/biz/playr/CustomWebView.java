@@ -1,121 +1,61 @@
 package biz.playr;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.Build;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.DragEvent;
 import android.view.MotionEvent;
-import android.view.View;
 import android.webkit.WebView;
 
-import androidx.annotation.RequiresApi;
-
+/**
+ * WebView that allows normal single-finger interaction with page content, but
+ * suppresses long-press and multi-touch (pinch/zoom and two-finger gestures).
+ */
 public class CustomWebView extends WebView {
-    private static final String className = BuildConfig.APP_NAMESPACE + ".CustomWebView";
-    Context myContext;
-    View.OnTouchListener onTouchListener = new View.OnTouchListener() {
-        public final static int FINGER_RELEASED = 0;
-        public final static int FINGER_TOUCHED = 1;
-        public final static int FINGER_DRAGGING = 2;
-        public final static int FINGER_UNDEFINED = 3;
-        private int fingerState = FINGER_RELEASED;
+	public CustomWebView(Context context) {
+		super(context);
+		configureInteraction();
+	}
 
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            Log.i(className, "override onTouch (webView onTouchListener)");
-            if (motionEvent.getPointerCount() > 1) {
-                fingerState = FINGER_UNDEFINED;
-                Log.i(className, "onTouch: multiple fingers detected, reset fingerState");
-            } else {
-                switch (motionEvent.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        if (fingerState == FINGER_RELEASED) {
-                            fingerState = FINGER_TOUCHED;
-                            Log.i(className, "onTouch: fingerState == FINGER_RELEASED");
-                        } else {
-                            fingerState = FINGER_UNDEFINED;
-                            Log.i(className, "onTouch: fingerState != FINGER_RELEASED");
-                        }
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        if (fingerState != FINGER_DRAGGING) {
-                            fingerState = FINGER_RELEASED;
-                            // handle click/touch here
-                            boolean result = performClick();
-                            Log.i(className, "onTouch: fingerState != FINGER_DRAGGING, result performClick: " + result + ", return true");
-                            return true;
-                        } else if (fingerState == FINGER_DRAGGING) {
-                            fingerState = FINGER_RELEASED;
-                            Log.i(className, "onTouch: fingerState == FINGER_DRAGGING");
-                        } else {
-                            fingerState = FINGER_UNDEFINED;
-                            Log.i(className, "onTouch: else; fingerState = FINGER_UNDEFINED");
-                        }
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        if (fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING) {
-                            fingerState = FINGER_DRAGGING;
-                            Log.i(className, "onTouch: fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING");
-                        } else {
-                            fingerState = FINGER_UNDEFINED;
-                            Log.i(className, "onTouch: !(fingerState == FINGER_TOUCHED || fingerState == FINGER_DRAGGING)");
-                        }
-                        break;
-                    default:
-                        fingerState = FINGER_UNDEFINED;
-                        Log.i(className, "onTouch: default; fingerState = FINGER_UNDEFINED");
-                }
-            }
-            Log.i(className, "onTouch: return false");
-            return false;
-        }
-    };
+	public CustomWebView(Context context, AttributeSet attributeSet) {
+		super(context, attributeSet);
+		configureInteraction();
+	}
 
-    public CustomWebView(Context context) {
-        super(context);
+	public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr) {
+		super(context, attributeSet, defStyleAttr);
+		configureInteraction();
+	}
 
-        this.myContext = context;
-        this.setLongClickable(false);
-    }
-    public CustomWebView(Context context, AttributeSet attributeSet) {
-        super(context, attributeSet);
-        myContext=context;
-        this.setLongClickable(false);
-    }
-    public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr) {
-        super(context, attributeSet, defStyleAttr);
-        myContext=context;
-        this.setLongClickable(false);
-    }
-    public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes)
-    {
-        super(context, attributeSet, defStyleAttr, defStyleRes);
-        myContext=context;
-        this.setLongClickable(false);
-    }
+	public CustomWebView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes) {
+		super(context, attributeSet, defStyleAttr, defStyleRes);
+		configureInteraction();
+	}
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        Log.i(className, "override onTouchEvent, delegate to onTouch or super");
-//        return (onTouchListener.onTouch(this, event) || super.onTouchEvent(event));
-        return performClick();
-    }
+	@SuppressLint("ClickableViewAccessibility")
+	private void configureInteraction() {
+		setLongClickable(false);
+		setOnLongClickListener(v -> true); // consume long-press; do not show context menu
+		// Built-in WebView zoom via pinch is also blocked by multi-touch filtering below.
+		getSettings().setSupportZoom(false);
+		getSettings().setBuiltInZoomControls(false);
+		getSettings().setDisplayZoomControls(false);
+	}
 
-    @Override
-    public boolean performLongClick() {
-        Log.i(className, "override performLongClick, return false");
-        return false;
-    };
+	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		if (event.getPointerCount() > 1) {
+			// End any in-progress single-finger gesture so Chromium does not get stuck.
+			MotionEvent cancel = MotionEvent.obtain(event);
+			cancel.setAction(MotionEvent.ACTION_CANCEL);
+			super.onTouchEvent(cancel);
+			cancel.recycle();
+			return true; // swallow multi-touch
+		}
+		return super.onTouchEvent(event);
+	}
 
-    @Override
-    public boolean performClick() {
-        Log.i(className, "override performClick, delegate to super");
-        return super.performClick();
-    }
-    @Override
-    public boolean onDragEvent(DragEvent dragEvent) {
-        Log.i(className, "override onDragEvent, return false");
-        return false;
-    }
+	@Override
+	public boolean performLongClick() {
+		return false;
+	}
 }
