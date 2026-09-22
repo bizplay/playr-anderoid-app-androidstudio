@@ -793,11 +793,15 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void requestManageOverlayPermission(Context context) {
-		// Overlay permission is a BAL exemption and a fallback for delayed restart on Android 10+.
-		// Do not open the system Settings screen automatically: dedicated players often have no
-		// usable input, and boot auto-start already works via BootUpReceiver.
-		Log.i(className, "requestManageOverlayPermission: overlay granted="
-				+ Settings.canDrawOverlays(context));
+		// Overlay (SYSTEM_ALERT_WINDOW) is a special app-op, not requestPermissions().
+		// It is the reliable BAL exemption for background relaunch on Android 10+ (including
+		// Shield / API 30). Do not open Settings automatically: many dedicated players have no
+		// usable input; operators grant via ADB or MDM.
+		boolean granted = Settings.canDrawOverlays(context);
+		Log.i(className, "requestManageOverlayPermission: overlay granted=" + granted);
+		if (!granted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			AppRestarter.logOverlayRequiredForBackgroundRelaunch(context);
+		}
 	}
 
 	private void requestLocalNetworkPermissionIfNeeded() {

@@ -155,12 +155,60 @@ final class AppRestarter {
 		Log.i(className, ".logBackgroundLaunchPrivileges: overlay=" + overlay
 				+ " fullScreenIntent=" + fullScreenIntentStatus(context)
 				+ " exactAlarms=" + exactAlarmStatus(context));
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && !overlay) {
-			Log.e(className, ".logBackgroundLaunchPrivileges: Android 14+ will BAL_BLOCK MainActivity"
-					+ " until SYSTEM_ALERT_WINDOW is granted. Operator grant:"
-					+ " adb shell appops set " + context.getPackageName()
-					+ " SYSTEM_ALERT_WINDOW allow");
+		// BAL applies from Android 10 (Q). With a high targetSdk, FGS alone is not enough on
+		// Shield/Android 11 either — SYSTEM_ALERT_WINDOW is the reliable exemption.
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !overlay) {
+			logOverlayRequiredForBackgroundRelaunch(context);
 		}
+	}
+
+	/**
+	 * Overlay ({@code SYSTEM_ALERT_WINDOW}) is a special app-op, not a normal runtime permission.
+	 * Manifest declaration is not sufficient; an operator must grant it via Settings or:
+	 * {@code adb shell appops set <pkg> SYSTEM_ALERT_WINDOW allow}
+	 */
+	static void logOverlayRequiredForBackgroundRelaunch(Context context) {
+		Log.e(className, ".\n"
+				+ "********************************************************************************\n"
+				+ "*** BACKGROUND RELAUNCH BLOCKED WITHOUT OVERLAY (BAL)\n"
+				+ "*** Android " + Build.VERSION.SDK_INT
+				+ " (targetSdk=" + context.getApplicationInfo().targetSdkVersion + ")\n"
+				+ "*** Grant display-over-other-apps / SYSTEM_ALERT_WINDOW:\n"
+				+ "***   adb shell appops set " + context.getPackageName()
+				+ " SYSTEM_ALERT_WINDOW allow\n"
+				+ "*** Or: Settings → Apps → "
+				+ context.getApplicationInfo().loadLabel(context.getPackageManager())
+				+ " → Display over other apps → Allow\n"
+				+ "********************************************************************************\n.");
+	}
+
+	/**
+	 * Called when {@link RestartForegroundService} confirms {@link MainActivity} is visible.
+	 */
+	static void onRelaunchSucceeded(Context context) {
+		clearRestartPending(context);
+		clearRestartScheduledMark(context);
+		Log.i(className, ".onRelaunchSucceeded: MainActivity visible, coordination cleared");
+	}
+
+	/**
+	 * Called when {@link RestartForegroundService} could not make {@link MainActivity} visible.
+	 * Without overlay, BAL blocks are expected: do not burn restart-backoff budget; clear
+	 * coordination so the watchdog can retry after a short soft delay.
+	 */
+	static void onRelaunchFailed(Context context, String reason) {
+		clearRestartPending(context);
+		clearRestartScheduledMark(context);
+		if (!hasOverlayLaunchExemption(context)
+				&& Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+			logOverlayRequiredForBackgroundRelaunch(context);
+			RestartBackoff.logBalBlockedNoOverlay(context, reason);
+			RestartBackoff.armSoftRetryDelay(context, 15_000L);
+			return;
+		}
+		RestartBackoff.recordAttempt(context,
+				reason == null || reason.isEmpty() ? "relaunch_failed" : reason + "_failed",
+				false);
 	}
 
 	/**
@@ -193,7 +241,7 @@ final class AppRestarter {
 					+ " (auto_start=" + autoStart + ", ignored=" + ignoreAutoStart
 					+ ", exactAlarms=" + exactAlarmStatus(context)
 					+ ", fullScreenIntent=" + fullScreenIntentStatus(context) + ")");
-			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
+			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS, "boot")) {
 				Log.e(className, ".launchFromBoot: foreground service start was rejected");
 				return false;
 			}
@@ -310,13 +358,14 @@ final class AppRestarter {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 			Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
 					+ RESTART_DELAY_MS + " ms, reason=" + reason);
-			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS)) {
+			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS, reason)) {
 				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service");
 				clearRestartPending(context);
 				return false;
 			}
 			markRestartScheduled(context);
-			RestartBackoff.recordAttempt(context, reason, force);
+			// Backoff is recorded only after relaunch outcome in RestartForegroundService —
+			// BAL failures without overlay must not consume the hourly restart budget.
 			return true;
 		}
 

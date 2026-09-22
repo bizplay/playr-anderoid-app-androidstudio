@@ -15,6 +15,9 @@
     <string name="restart_notification_channel_description">Keeps Player running briefly so it can restart after being closed.</string>
     <string name="restart_notification_title">Restarting Player</string>
     <string name="restart_notification_text">Player will reopen shortly.</string>
+    <string name="restart_notification_failed_text">Player could not reopen automatically. Tap to open.</string>
+    <string name="restart_notification_overlay_title">Player needs overlay permission</string>
+    <string name="restart_notification_overlay_text">Allow Display over other apps, or: adb shell appops set biz.playr SYSTEM_ALERT_WINDOW allow</string>
     <string name="watchdog_notification_channel_name">Player watchdog</string>
     <string name="watchdog_notification_channel_description">Monitors the player process and restarts it after a crash.</string>
     <string name="watchdog_notification_title">Player monitor</string>

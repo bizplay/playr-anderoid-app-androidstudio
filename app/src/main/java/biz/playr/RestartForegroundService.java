@@ -21,25 +21,39 @@ import android.util.Log;
  * Launches {@link MainActivity} from a foreground service. Used after boot and after the
  * activity is closed, where a direct {@code startActivity()} from a receiver or AlarmManager
  * is blocked (BAL). {@code BOOT_COMPLETED} may start this service; it may not start an activity.
- * A {@code specialUse} FGS is not a BAL exemption on Android 14, so the notification uses a
- * full-screen intent and {@link PendingIntent#send} is always tried after {@code startActivity}.
+ * <p>
+ * On Android 10+ with a high targetSdk, an FGS alone is often not a BAL exemption (seen on
+ * Shield / Android 11). The notification uses a full-screen intent and {@link PendingIntent#send}
+ * is always tried after {@code startActivity}. {@code SYSTEM_ALERT_WINDOW} is the reliable
+ * exemption for unattended relaunch.
  */
 public class RestartForegroundService extends Service {
 	private static final String className = BuildConfig.APP_NAMESPACE + ".RestartFgServ";
 	private static final String EXTRA_DELAY_MS = "delay_ms";
+	private static final String EXTRA_REASON = "reason";
 	private static final int NOTIFICATION_ID = 1001;
 	private static final int RESTART_PENDING_INTENT_REQUEST_CODE = 1001;
 	static final String NOTIFICATION_CHANNEL_ID = "playr_launch";
-	private static final long STOP_AFTER_LAUNCH_MS = 4000;
+	/** Brief hold after a successful relaunch. */
+	private static final long STOP_AFTER_SUCCESS_MS = 4_000L;
+	/** Keep FGS + full-screen-intent notification longer when launch appears BAL-blocked. */
+	private static final long STOP_AFTER_FAILURE_MS = 60_000L;
 
 	private final Handler handler = new Handler(Looper.getMainLooper());
 	private Runnable restartTask;
 	private Runnable stopTask;
+	private Runnable outcomeTask;
 	private MediaSession mediaSession;
+	private String restartReason = "unspecified";
 
 	static boolean scheduleRestart(Context context, long delayMs) {
+		return scheduleRestart(context, delayMs, "unspecified");
+	}
+
+	static boolean scheduleRestart(Context context, long delayMs, String reason) {
 		Intent intent = new Intent(context, RestartForegroundService.class);
 		intent.putExtra(EXTRA_DELAY_MS, delayMs);
+		intent.putExtra(EXTRA_REASON, reason == null ? "unspecified" : reason);
 		Context appContext = context.getApplicationContext();
 		try {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -61,11 +75,15 @@ public class RestartForegroundService extends Service {
 		long delayMs = AppRestarter.RESTART_DELAY_MS;
 		if (intent != null) {
 			delayMs = intent.getLongExtra(EXTRA_DELAY_MS, AppRestarter.RESTART_DELAY_MS);
+			String reason = intent.getStringExtra(EXTRA_REASON);
+			if (reason != null && !reason.isEmpty()) {
+				restartReason = reason;
+			}
 		}
 
 		createNotificationChannel();
 		ensureMediaSession();
-		Notification notification = buildLaunchNotification();
+		Notification notification = buildLaunchNotification(false);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
 			try {
 				startForeground(
@@ -89,7 +107,7 @@ public class RestartForegroundService extends Service {
 		}
 		restartTask = this::relaunchMainActivity;
 		handler.postDelayed(restartTask, delayMs);
-		Log.i(className, ".onStartCommand: relaunch in " + delayMs + " ms");
+		Log.i(className, ".onStartCommand: relaunch in " + delayMs + " ms, reason=" + restartReason);
 		return START_NOT_STICKY;
 	}
 
@@ -98,6 +116,10 @@ public class RestartForegroundService extends Service {
 		if (restartTask != null) {
 			handler.removeCallbacks(restartTask);
 			restartTask = null;
+		}
+		if (outcomeTask != null) {
+			handler.removeCallbacks(outcomeTask);
+			outcomeTask = null;
 		}
 		if (stopTask != null) {
 			handler.removeCallbacks(stopTask);
@@ -118,32 +140,61 @@ public class RestartForegroundService extends Service {
 	private void relaunchMainActivity() {
 		if (MainActivity.isInstanceAlive()) {
 			Log.i(className, ".relaunchMainActivity: MainActivity already running, skip CLEAR_TASK relaunch");
-			stopAfterDelay();
+			AppRestarter.onRelaunchSucceeded(this);
+			stopAfterDelay(STOP_AFTER_SUCCESS_MS);
 			return;
 		}
 		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
 		// startActivity does not throw when BAL blocks the launch (result code 102).
 		startActivityWithBalOptIn(activityIntent);
 		sendRestartPendingIntent(activityIntent);
-		stopAfterDelay();
+		// Give FSI / PendingIntent a chance; check outcome after a short settle, then either
+		// stop quickly (success) or keep the notification up longer (failure).
+		if (outcomeTask != null) {
+			handler.removeCallbacks(outcomeTask);
+		}
+		outcomeTask = this::evaluateRelaunchOutcome;
+		handler.postDelayed(outcomeTask, STOP_AFTER_SUCCESS_MS);
 	}
 
-	private void stopAfterDelay() {
+	private void evaluateRelaunchOutcome() {
+		if (MainActivity.isInstanceAlive()) {
+			Log.i(className, ".evaluateRelaunchOutcome: MainActivity visible");
+			AppRestarter.onRelaunchSucceeded(this);
+			stopAfterDelay(STOP_AFTER_SUCCESS_MS);
+			return;
+		}
+		Log.e(className, ".evaluateRelaunchOutcome: MainActivity still not visible after launch attempts");
+		AppRestarter.onRelaunchFailed(this, restartReason);
+		updateFailureNotification();
+		stopAfterDelay(STOP_AFTER_FAILURE_MS);
+	}
+
+	private void stopAfterDelay(long delayMs) {
 		if (stopTask != null) {
 			handler.removeCallbacks(stopTask);
 		}
 		stopTask = this::stopNow;
-		handler.postDelayed(stopTask, STOP_AFTER_LAUNCH_MS);
+		handler.postDelayed(stopTask, delayMs);
 	}
 
 	private void stopNow() {
 		if (MainActivity.isInstanceAlive()) {
 			Log.i(className, ".stopNow: MainActivity is running");
 		} else {
-			Log.e(className, ".stopNow: MainActivity still not visible after launch attempts");
+			Log.e(className, ".stopNow: stopping after failed relaunch hold (reason=" + restartReason + ")");
 		}
 		stopForeground(STOP_FOREGROUND_REMOVE);
 		stopSelf();
+	}
+
+	private void updateFailureNotification() {
+		NotificationManager notificationManager =
+				(NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+		if (notificationManager == null) {
+			return;
+		}
+		notificationManager.notify(NOTIFICATION_ID, buildLaunchNotification(true));
 	}
 
 	private void startActivityWithBalOptIn(Intent activityIntent) {
@@ -218,15 +269,23 @@ public class RestartForegroundService extends Service {
 	}
 
 	@SuppressWarnings("deprecation")
-	private Notification buildLaunchNotification() {
+	private Notification buildLaunchNotification(boolean relaunchFailed) {
 		PendingIntent fullScreenIntent = launchPendingIntent(
 				AppRestarter.createRestartActivityIntent(this));
 		Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 				? new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
 				: new Notification.Builder(this);
-		builder.setContentTitle(getString(R.string.restart_notification_title))
-				.setContentText(getString(R.string.restart_notification_text))
-				.setSmallIcon(R.drawable.ic_launcher)
+		if (relaunchFailed && !Settings.canDrawOverlays(this)) {
+			builder.setContentTitle(getString(R.string.restart_notification_overlay_title))
+					.setContentText(getString(R.string.restart_notification_overlay_text));
+		} else if (relaunchFailed) {
+			builder.setContentTitle(getString(R.string.restart_notification_title))
+					.setContentText(getString(R.string.restart_notification_failed_text));
+		} else {
+			builder.setContentTitle(getString(R.string.restart_notification_title))
+					.setContentText(getString(R.string.restart_notification_text));
+		}
+		builder.setSmallIcon(R.drawable.ic_launcher)
 				.setOngoing(true)
 				.setCategory(Notification.CATEGORY_ALARM)
 				.setContentIntent(fullScreenIntent)

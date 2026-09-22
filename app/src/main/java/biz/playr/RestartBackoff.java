@@ -115,6 +115,16 @@ final class RestartBackoff {
 				"backoff counters reset; auto-restart re-enabled");
 	}
 
+	/**
+	 * Soft delay before the next auto-restart without increasing streak/window counts.
+	 * Used when relaunch was doomed (e.g. BAL without overlay) so we retry soon instead of
+	 * consuming the hourly restart budget.
+	 */
+	static void armSoftRetryDelay(Context context, long delayMs) {
+		long nextAllowed = System.currentTimeMillis() + Math.max(0L, delayMs);
+		prefs(context).edit().putLong(KEY_NEXT_ALLOWED, nextAllowed).commit();
+	}
+
 	static void logRestartBlocked(Context context, String reason) {
 		SharedPreferences prefs = prefs(context);
 		long now = System.currentTimeMillis();
@@ -143,6 +153,12 @@ final class RestartBackoff {
 				+ (prefs.getLong(KEY_LAST_ATTEMPT, 0L) == 0L ? "never"
 						: ((now - prefs.getLong(KEY_LAST_ATTEMPT, 0L)) / 1000) + " s ago") + "\n"
 				+ "********************************************************************************\n.");
+	}
+
+	/** Public so relaunch paths can log BAL/overlay guidance without counting a failed attempt. */
+	static void logBalBlockedNoOverlay(Context context, String reason) {
+		logOperatorEvent(context, "BAL_BLOCKED_NO_OVERLAY", reason,
+				"relaunch not counted toward backoff; grant SYSTEM_ALERT_WINDOW then retry");
 	}
 
 	static boolean isCircuitOpen(Context context) {
