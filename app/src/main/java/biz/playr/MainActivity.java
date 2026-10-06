@@ -1139,8 +1139,16 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		recordMemoryRecovery(status);
 		switch (status) {
 			case CRITICAL:
+				// While playing, only process-restart when Android itself reports lowMemory and
+				// availMem is near the LMK threshold — same gate as LOW hard recovery.
+				if (playing && !shouldHardRecoverWhilePlaying()) {
+					Log.e(className, ".freeMemoryWhenNeeded: CRITICAL while playing => softFreeMemory"
+							+ " (skip restart; not lowMemory+nearThreshold)");
+					softFreeMemory("CRITICAL_while_playing");
+					break;
+				}
 				Log.e(className, ".freeMemoryWhenNeeded: CRITICAL => scheduled restart (memory_pressure)"
-						+ (playing ? " [playing]" : ""));
+						+ (playing ? " [playing+system lowMemory]" : ""));
 				if (AppRestarter.scheduleDelayedBackgroundRestart(
 						getApplicationContext(), false, "memory_pressure")) {
 					finish();

@@ -7,18 +7,20 @@ import android.content.ComponentCallbacks2;
  * Combines Android's low-memory signals into a single {@link MemoryStatus}. The threshold-only
  * check ({@code availMem} vs {@code MemoryInfo.threshold}) misses device-wide pressure that still
  * triggers LMK kills while {@code lowMemory} remains false.
+ * <p>
+ * Heuristics ({@code % system used}, avail-vs-initial, trim) are capped at {@link MemoryStatus#MEDIUM}
+ * so they only drive soft reclaim / logging. {@link MemoryStatus#CRITICAL} comes only from
+ * proximity to Android's LMK {@code threshold}; hard WebView teardown while playing additionally
+ * requires {@code lowMemory} (see {@code MainActivity}).
  */
 final class MemoryPressureEvaluator {
 	static final int TRIM_NONE = -1;
 
-	// Tuned for always-on WebView players on low-RAM STBs: routine 4K decode often sits
-	// around 70–85% system used without being an emergency. Previous 80/85/90 thresholds
-	// triggered recreate/reload storms that made LMK more likely.
+	// Always-on WebView players often sit at high system used % without being in danger.
+	// Cap this signal at MEDIUM — never escalate to LOW/CRITICAL from %used alone.
 	private static final int SYSTEM_USED_MEDIUM_PCT = 88;
-	private static final int SYSTEM_USED_LOW_PCT = 92;
-	private static final int SYSTEM_USED_CRITICAL_PCT = 96;
-	/** Session available RAM fell below this fraction of the value at startup. */
-	private static final int AVAIL_VS_INITIAL_CRITICAL_PCT = 30;
+	/** Session available RAM fell below this fraction of the value at startup → MEDIUM (capped). */
+	private static final int AVAIL_VS_INITIAL_MEDIUM_PCT = 55;
 
 	private MemoryPressureEvaluator() {
 	}
@@ -54,6 +56,7 @@ final class MemoryPressureEvaluator {
 						: MemoryStatus.OK);
 	}
 
+	/** Platform LMK threshold proximity — the only path that may return CRITICAL. */
 	private static MemoryStatus thresholdStatus(long availableMemory, long threshold) {
 		if (availableMemory > 1.25 * threshold) {
 			return MemoryStatus.OK;
@@ -67,35 +70,25 @@ final class MemoryPressureEvaluator {
 		return MemoryStatus.CRITICAL;
 	}
 
+	/** Busy-RAM heuristic only; capped at MEDIUM. */
 	private static MemoryStatus systemUsedStatus(ActivityManager.MemoryInfo info) {
 		if (info.totalMem <= 0L) {
 			return MemoryStatus.OK;
 		}
 		int usedPct = (int) (((info.totalMem - info.availMem) * 100L) / info.totalMem);
-		if (usedPct >= SYSTEM_USED_CRITICAL_PCT) {
-			return MemoryStatus.CRITICAL;
-		}
-		if (usedPct >= SYSTEM_USED_LOW_PCT) {
-			return MemoryStatus.LOW;
-		}
 		if (usedPct >= SYSTEM_USED_MEDIUM_PCT) {
 			return MemoryStatus.MEDIUM;
 		}
 		return MemoryStatus.OK;
 	}
 
+	/** Session drift heuristic only; capped at MEDIUM. */
 	private static MemoryStatus availVsInitialStatus(long availMem, long initialAvailMem) {
 		if (initialAvailMem <= 0L) {
 			return MemoryStatus.OK;
 		}
 		int pct = (int) ((availMem * 100L) / initialAvailMem);
-		if (pct < AVAIL_VS_INITIAL_CRITICAL_PCT) {
-			return MemoryStatus.CRITICAL;
-		}
-		if (pct < 40) {
-			return MemoryStatus.LOW;
-		}
-		if (pct < 55) {
+		if (pct < AVAIL_VS_INITIAL_MEDIUM_PCT) {
 			return MemoryStatus.MEDIUM;
 		}
 		return MemoryStatus.OK;
@@ -105,9 +98,7 @@ final class MemoryPressureEvaluator {
 		if (trimLevel == TRIM_NONE) {
 			return MemoryStatus.OK;
 		}
-		// Trim alone is a hint, not proof the UI must be torn down. Cap at MEDIUM so
-		// freeMemoryWhenNeeded can soft-reclaim while content is playing; CRITICAL still
-		// comes from threshold / lowMemory / extreme %used.
+		// Trim alone is a hint, not proof the UI must be torn down. Cap at MEDIUM.
 		if (trimLevel >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
 			return MemoryStatus.MEDIUM;
 		}
