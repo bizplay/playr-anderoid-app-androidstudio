@@ -62,8 +62,8 @@
 	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 	<!-- Exact-alarm permissions (SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM) are intentionally omitted:
 	     Play Store restricts USE_EXACT_ALARM to alarm/calendar apps. Restarts use
-	     RestartForegroundService (API 29+), PlayerWatchdogService, BootUpReceiver, and
-	     inexact AlarmManager.set() on older APIs only. -->
+	     RestartForegroundService, PlayerWatchdogService, BootUpReceiver, and
+	     RestartAlarmReceiver (inexact AlarmManager fallback / pre-Q crash path). -->
 
 	<!-- usesCleartextTraffic is default false from API28 meaning only https calls are allowed-->
 	<application
@@ -170,5 +170,9 @@
 				<action android:name="android.intent.action.LOCKED_BOOT_COMPLETED"/>
 			</intent-filter>
 		</receiver>
+		<receiver
+			android:name="biz.playr.RestartAlarmReceiver"
+			android:exported="false"
+			android:enabled="true"/>
 	</application>
 </manifest>

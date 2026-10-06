@@ -406,14 +406,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		Log.i(className, "override onStop");
 		this.unBindServiceConnection();
 		stopWatchdogHeartbeat();
-		// Start the delayed restart while we are still more likely to be allowed to start a
-		// foreground service. Skip configuration changes (rotation) so those do not restart-loop.
-		if (isFinishing() && !isChangingConfigurations()) {
-			if (!getResources().getBoolean(R.bool.restart)) {
-				PlayerWatchdogClient.disableMonitoring(getApplicationContext());
-			}
-			Log.i(className, "onStop: activity is finishing, scheduling delayed restart");
-			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false, "activity_finish");
+		// Do not schedule a relaunch here. CLEAR_TASK relaunches finish this activity; arming
+		// another delayed restart from onStop caused a create→kill loop on Android 9 (MAWi).
+		// Explicit recovery paths (loader_stuck, watchdog, etc.) schedule before finish(); the
+		// watchdog owns bringing the player back if the UI dies without that.
+		if (isFinishing() && !isChangingConfigurations()
+				&& !getResources().getBoolean(R.bool.restart)) {
+			PlayerWatchdogClient.disableMonitoring(getApplicationContext());
 		}
 		super.onStop();
 		Log.i(className, "onStop: end");
@@ -447,13 +446,10 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		// DefaultExceptionHandler.restartDelay, pendingIntent);
 		//
 
-		// Fallback if onStop did not already schedule (guarded against double-schedule).
-		// Skip configuration changes so rotation does not restart-loop.
-		if (!isChangingConfigurations()) {
-			Log.i(className, "onDestroy: scheduling delayed background restart if needed");
-			AppRestarter.scheduleDelayedBackgroundRestart(getApplicationContext(), false, "activity_destroy");
-		} else {
-			Log.i(className, "onDestroy: configuration change, not scheduling delayed restart");
+		// Same as onStop: never arm a relaunch from teardown. Our own CLEAR_TASK relaunch
+		// destroys this instance; scheduling here would kill the replacement shortly after.
+		if (isChangingConfigurations()) {
+			Log.i(className, "onDestroy: configuration change");
 		}
 
 		Log.i(className, "onDestroy: stopMemoryChecking");

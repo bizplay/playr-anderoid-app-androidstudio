@@ -15,8 +15,10 @@ import android.util.Log;
 /**
  * Coordinates application restarts. Use {@link #restartImmediateRecreate(Activity, boolean)} or
  * {@link #restartImmediateRelaunch(Context, boolean)} while the app is still in the foreground.
- * Use {@link #scheduleDelayedBackgroundRestart(Context, boolean)} from {@code onStop}/{@code onDestroy}
- * when the app is being closed.
+ * Use {@link #scheduleDelayedBackgroundRestart(Context, boolean, String)} from explicit recovery
+ * paths (watchdog, loader stuck, memory pressure, etc.). Do not schedule from
+ * {@code MainActivity.onStop}/{@code onDestroy}: CLEAR_TASK relaunches finish the old activity and
+ * must not arm a second relaunch.
  */
 final class AppRestarter {
 	private static final String className = BuildConfig.APP_NAMESPACE + ".AppRestarter";
@@ -298,7 +300,7 @@ final class AppRestarter {
 
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
 			Log.i(className, ".restartAfterUncaughtException: scheduling alarm restart");
-			if (scheduleAlarmRestart(context)) {
+			if (scheduleAlarmRestart(context, "java_crash")) {
 				markRestartScheduled(context);
 				RestartBackoff.recordAttempt(context, "java_crash", force);
 				return true;
@@ -333,9 +335,18 @@ final class AppRestarter {
 	}
 
 	/**
-	 * Schedules a delayed restart for when the activity is being closed. On Android 10+ this uses
-	 * a short-lived foreground service so the relaunch is not treated as a blocked background
-	 * activity start. Pre-Q keeps AlarmManager, which was not subject to BAL.
+	 * True when a delayed relaunch must recycle {@link MainActivity} even if an instance is
+	 * already visible (server-commanded reboot). Other reasons skip CLEAR_TASK when alive.
+	 */
+	static boolean shouldForceRelaunchEvenIfAlive(String reason) {
+		return "watchdog_server_command".equals(reason);
+	}
+
+	/**
+	 * Schedules a delayed relaunch. Prefer {@link RestartForegroundService} on all API levels so
+	 * the launch path can skip {@code CLEAR_TASK} when {@link MainActivity} is already alive
+	 * (except server-forced reboot). AlarmManager activity PendingIntents are only a fallback
+	 * when the FGS cannot start, and for pre-Q crash recovery where the process is dying.
 	 */
 	static boolean scheduleDelayedBackgroundRestart(Context context, boolean force) {
 		return scheduleDelayedBackgroundRestart(context, force, "unspecified");
@@ -355,21 +366,18 @@ final class AppRestarter {
 			return false;
 		}
 
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-			Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
-					+ RESTART_DELAY_MS + " ms, reason=" + reason);
-			if (!RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS, reason)) {
-				Log.e(className, ".scheduleDelayedBackgroundRestart: could not start foreground service");
-				clearRestartPending(context);
-				return false;
-			}
+		Log.i(className, ".scheduleDelayedBackgroundRestart: starting foreground service, delay "
+				+ RESTART_DELAY_MS + " ms, reason=" + reason);
+		if (RestartForegroundService.scheduleRestart(context, RESTART_DELAY_MS, reason)) {
 			markRestartScheduled(context);
 			// Backoff is recorded only after relaunch outcome in RestartForegroundService —
 			// BAL failures without overlay must not consume the hourly restart budget.
 			return true;
 		}
+		Log.e(className, ".scheduleDelayedBackgroundRestart: foreground service start failed,"
+				+ " falling back to alarm");
 
-		if (scheduleAlarmRestart(context)) {
+		if (scheduleAlarmRestart(context, reason)) {
 			markRestartScheduled(context);
 			RestartBackoff.recordAttempt(context, reason, force);
 			return true;
@@ -378,12 +386,20 @@ final class AppRestarter {
 		return false;
 	}
 
-	private static boolean scheduleAlarmRestart(Context context) {
-		PendingIntent launchPendingIntent = PendingIntent.getActivity(
+	/**
+	 * Alarm that starts {@link RestartAlarmReceiver}, which skips CLEAR_TASK when MainActivity
+	 * is already alive (same guard as {@link RestartForegroundService}).
+	 */
+	private static boolean scheduleAlarmRestart(Context context, String reason) {
+		Intent receiverIntent = new Intent(context.getApplicationContext(), RestartAlarmReceiver.class);
+		receiverIntent.setAction(RestartAlarmReceiver.ACTION_RELAUNCH);
+		receiverIntent.putExtra(RestartAlarmReceiver.EXTRA_REASON,
+				reason == null ? "alarm" : reason);
+		PendingIntent launchPendingIntent = PendingIntent.getBroadcast(
 				context.getApplicationContext(),
 				RESTART_PENDING_INTENT_REQUEST_CODE,
-				createRestartActivityIntent(context),
-				PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+				receiverIntent,
+				PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
 		AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 		if (alarmManager == null) {

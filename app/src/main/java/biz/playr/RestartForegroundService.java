@@ -138,11 +138,17 @@ public class RestartForegroundService extends Service {
 	}
 
 	private void relaunchMainActivity() {
-		if (MainActivity.isInstanceAlive()) {
-			Log.i(className, ".relaunchMainActivity: MainActivity already running, skip CLEAR_TASK relaunch");
+		if (MainActivity.isInstanceAlive()
+				&& !AppRestarter.shouldForceRelaunchEvenIfAlive(restartReason)) {
+			Log.i(className, ".relaunchMainActivity: MainActivity already running, skip CLEAR_TASK"
+					+ " relaunch (reason=" + restartReason + ")");
 			AppRestarter.onRelaunchSucceeded(this);
 			stopAfterDelay(STOP_AFTER_SUCCESS_MS);
 			return;
+		}
+		if (MainActivity.isInstanceAlive()) {
+			Log.i(className, ".relaunchMainActivity: MainActivity running but forcing CLEAR_TASK"
+					+ " relaunch (reason=" + restartReason + ")");
 		}
 		Intent activityIntent = AppRestarter.createRestartActivityIntent(this);
 		// startActivity does not throw when BAL blocks the launch (result code 102).
