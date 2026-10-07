@@ -74,9 +74,10 @@ public class BootUpReceiver extends BroadcastReceiver{
 		} else {
 			Log.i(className, ".onReceive: MainActivity not started from boot receiver");
 		}
-		if (context.getResources().getBoolean(R.bool.restart)) {
-			PlayerWatchdogClient.enableMonitoring(context, readStoredPlayerId(context));
-		}
+		// Always start the watchdog so the server can command a relaunch even when RESTART=false.
+		PlayerWatchdogClient.enableMonitoring(context, readStoredPlayerId(context));
+		Log.i(className, ".onReceive: watchdog enable requested (restart="
+				+ context.getResources().getBoolean(R.bool.restart) + ")");
 // }
 		Log.i(className, ".onReceive: end");
 	}

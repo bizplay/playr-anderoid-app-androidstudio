@@ -154,17 +154,18 @@ android {
         }
     }
     // The resource values auto_start and restart can be accessed in the Java code by calling
-    // context.getResources().getBoolean(R.bool.auto_start)
-    // Setting auto_start to true will make the application start automatically when the device is
-    // started for professional displays this might interfere with the functionality to start a
-    // specific application when the device is turned on. That is why this resource is set to false
-    // for the ProDisplay build
-    // Setting restart will cause the app to try to relaunch itself after 30 seconds when it is
-    // closed (by the user or system (after an exception) since this can lead to unwanted loops
-    // this is also set to false in the ProDisplay build
-    // NB: The restart option does not influence the restart that the watchdog issues since that is
-    // done deliberately. It can turn out that setting the restart option to false is also a better
-    // default for the normal build
+    // context.getResources().getBoolean(R.bool.auto_start) / R.bool.restart
+    //
+    // auto_start: launch MainActivity after BOOT_COMPLETED. Set false for Pro Display when the
+    // firmware (or another launcher) owns cold start. Ignored on Android 14+ (boot receiver is
+    // the only legal self-start path there).
+    //
+    // restart (RESTART in gradle.properties):
+    //   true  — local auto-recovery: crash handler, stale heartbeat, main-process-dead, memory
+    //           pressure, loader_stuck process relaunch, etc. (AppRestarter force=false).
+    //   false — allow the app to stay down after crashes / local failures (Pro Display).
+    // The :watchdog process always runs either way. Server-commanded reboot uses force=true and
+    // is not gated by RESTART.
     buildTypes {
         release {
             minifyEnabled true

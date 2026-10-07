@@ -421,6 +421,8 @@ final class AppRestarter {
 	}
 
 	private static boolean shouldRestart(Context context, boolean force) {
+		// force=true: server / deliberate watchdog reboot — always allowed.
+		// force=false: local auto-recovery — only when R.bool.restart (RESTART) is true.
 		return context.getResources().getBoolean(R.bool.restart) || force;
 	}
 

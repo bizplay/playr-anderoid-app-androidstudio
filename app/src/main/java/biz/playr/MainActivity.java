@@ -408,12 +408,8 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		stopWatchdogHeartbeat();
 		// Do not schedule a relaunch here. CLEAR_TASK relaunches finish this activity; arming
 		// another delayed restart from onStop caused a create→kill loop on Android 9 (MAWi).
-		// Explicit recovery paths (loader_stuck, watchdog, etc.) schedule before finish(); the
-		// watchdog owns bringing the player back if the UI dies without that.
-		if (isFinishing() && !isChangingConfigurations()
-				&& !getResources().getBoolean(R.bool.restart)) {
-			PlayerWatchdogClient.disableMonitoring(getApplicationContext());
-		}
+		// Explicit recovery paths (loader_stuck, etc.) schedule before finish(); the watchdog
+		// stays running (even when RESTART=false) so the server can still command a relaunch.
 		super.onStop();
 		Log.i(className, "onStop: end");
 	}
@@ -1384,10 +1380,12 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 	}
 
 	private void startWatchdogHeartbeat() {
-		if (!getResources().getBoolean(R.bool.restart)) {
-			return;
-		}
+		// Watchdog always runs: server-commanded relaunch (force=true) must work even when
+		// RESTART=false. Local auto-recovery (crash, stale heartbeat, memory) stays gated by
+		// R.bool.restart via AppRestarter.shouldRestart(..., force=false).
+		boolean autoRestart = getResources().getBoolean(R.bool.restart);
 		String playerId = getPlayerId();
+		Log.i(className, "startWatchdogHeartbeat: enabling watchdog (restart=" + autoRestart + ")");
 		PlayerWatchdogClient.enableMonitoring(this, playerId);
 		if (heartbeatHandler == null) {
 			heartbeatHandler = new Handler(Looper.getMainLooper());
