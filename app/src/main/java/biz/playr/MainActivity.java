@@ -364,7 +364,13 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 		super.onResume();
 
 		hideBars();
-		if (webView != null) { webView.onResume(); }
+		if (webView != null) {
+			webView.onResume();
+			// pauseTimers() is process-wide; always re-enable in case a dying
+			// MainActivity (CLEAR_TASK / config change) paused timers after we
+			// already called resumeTimers() in setupWebView.
+			webView.resumeTimers();
+		}
 	}
 
 	@Override
@@ -1512,11 +1518,11 @@ public class MainActivity extends Activity implements IServiceCallbacks {
 				webView.destroyDrawingCache();
 			}
 
-			// NOTE: This pauses JavaScript execution for ALL WebViews,
-			// do not use if you have other WebViews still alive.
-			// If you create another WebView after calling this,
-			// make sure to call mWebView.resumeTimers().
-			webView.pauseTimers();
+			// Do NOT call pauseTimers() here. It pauses JS for ALL WebViews in
+			// the process. Boot CLEAR_TASK and keyboard config-change recreate
+			// destroy an old MainActivity after the new one already called
+			// resumeTimers(), which freezes the loader Image onload and leaves
+			// the spinner stuck until something recreates the WebView again.
 
 			Log.i(className, "destroyWebView: webView.destroy()");
 			webView.destroy();

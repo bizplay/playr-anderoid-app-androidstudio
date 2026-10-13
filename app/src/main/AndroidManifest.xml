@@ -110,6 +110,7 @@
 			android:keepScreenOn="true"
 			android:showWhenLocked="true"
 			android:turnScreenOn="true"
+			android:configChanges="keyboard|keyboardHidden|navigation"
 			android:exported="true" >
 			<!-- for TWA -->
 			<!--<intent-filter android:autoVerify="true">-->

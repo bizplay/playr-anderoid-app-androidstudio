@@ -34,18 +34,45 @@
       // CORS-blocked and never reaches readyState 4 / status 200. Loading an <img>
       // does not require CORS headers on the PNG.
       var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
+      // Image onload/onerror can hang indefinitely (no HTTP timeout). On MAWi we
+      // have seen loadPlayer set img.src and then neither callback for tens of
+      // seconds while the spinner stays up. Cap the wait so we retry.
+      var imageCheckTimeoutMs = 15000;
       try {
         var img = new Image();
+        var settled = false;
+        var timeoutHandle = 0;
+        function settle(next) {
+          if (settled) { return; }
+          settled = true;
+          if (timeoutHandle > 0) { clearTimeout(timeoutHandle); timeoutHandle = 0; }
+          next();
+        }
         img.onload = function () {
-          showStatus("Starting playback", "loading content...", "info");
-          console.error("loadPlayer image onload gotoPlayer()");
-          gotoPlayer();
+          settle(function () {
+            showStatus("Starting playback", "loading content...", "info");
+            console.error("loadPlayer image onload gotoPlayer()");
+            gotoPlayer();
+          });
         };
         img.onerror = function () {
-          showStatus("Error", "test image not reachable", "error");
-          console.error("loadPlayer image onerror retryLoading()");
-          retryLoading();
+          settle(function () {
+            showStatus("Error", "test image not reachable", "error");
+            console.error("loadPlayer image onerror retryLoading()");
+            retryLoading();
+          });
         };
+        timeoutHandle = setTimeout(function () {
+          settle(function () {
+            showStatus("Error", "test image check timed out", "error");
+            console.error("loadPlayer image timeout retryLoading()");
+            // Drop the hung request so a late onload cannot navigate after retry.
+            img.onload = null;
+            img.onerror = null;
+            img.src = "";
+            retryLoading();
+          });
+        }, imageCheckTimeoutMs);
         console.error("loadPlayer image.src " + url);
         img.src = url;
       } catch (exception) {
