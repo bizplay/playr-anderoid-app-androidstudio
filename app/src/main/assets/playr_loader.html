@@ -33,21 +33,23 @@
       // file:// (and unique opaque origins) as cross-origin, so XHR to playr.biz is
       // CORS-blocked and never reaches readyState 4 / status 200. Loading an <img>
       // does not require CORS headers on the PNG.
-      var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + escape(new Date().getTime());
+      // encodeURIComponent not necessary since new Date().getTime() returns only numbers
+      var url = (queryString.https_required === "yes" ? "https" : "http") + "://www.playr.biz/playr_loader_test_image.png?" + new Date().getTime();
       // Image onload/onerror can hang indefinitely (no HTTP timeout). On MAWi we
       // have seen loadPlayer set img.src and then neither callback for tens of
       // seconds while the spinner stays up. Cap the wait so we retry.
       var imageCheckTimeoutMs = 15000;
-      try {
-        var img = new Image();
-        var settled = false;
-        var timeoutHandle = 0;
-        function settle(next) {
+      var settled = false;
+      var timeoutHandle = 0;
+      var settle = function (next) {
+          "use strict";
           if (settled) { return; }
           settled = true;
           if (timeoutHandle > 0) { clearTimeout(timeoutHandle); timeoutHandle = 0; }
           next();
-        }
+        };
+      try {
+        var img = new Image();
         img.onload = function () {
           settle(function () {
             showStatus("Starting playback", "loading content...", "info");
@@ -81,7 +83,7 @@
         retryLoading();
       }
       console.error("loadPlayer end");
-    };
+    }
 
     function gotoPlayer() {
       "use strict";
@@ -93,11 +95,12 @@
       document.getElementById("exception_message").style.display = "none";
       // Append Date param to ensure cache bypass. Navigate immediately: a delayed
       // setTimeout can be frozen by WebView.onPause() and leave the loader stuck.
-      var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version + "&ts=" + escape(new Date().getTime());
+      // encodeURIComponent not necessary since new Date().getTime() returns only numbers
+      var windowLocation = (queryString.https_required === "yes" ? "https" : "http") + "://play.playr.biz/?player_id=" + queryString.player_id + "&app_version=" + queryString.app_version + "&ts=" + new Date().getTime();
       console.error("gotoPlayer navigate " + windowLocation);
       window.location = windowLocation;
       console.error("gotoPlayer end");
-    };
+    }
 
     function retryLoading() {
       "use strict";
@@ -117,16 +120,21 @@
         }
       }, 1000);
       console.error("retryLoading end");
-    };
+    }
 
     function displayInformation() {
       "use strict";
-      document.getElementById("parameters").innerHTML = '<table style="width:50%; padding:5px; bottom:50px; text-align:left;" >' +
+      try {
+        document.getElementById("parameters").innerHTML = '<table style="width:50%; padding:5px; bottom:50px; text-align:left;" >' +
         '<tr><td><h3>Parameters:</h3></td><td></td></tr>' + listParameters() + "</table>";
-      document.getElementById("parameters").style.display = "block";
-    };
+        document.getElementById("parameters").style.display = "block";
+      } catch (exception) {
+        console.error("displayInformation exception: " + exception.message);
+      }
+    }
 
     function handleSpaces(text) {
+      "use strict";
       return text.replace(/ /g, "&nbsp;").replace(/&nbsp;\(/g, "<br>(").replace(/\)&nbsp;/g, ")<br>");
     }
 
@@ -143,9 +151,10 @@
       }
       result += makeLineIfValueDefined("resolution", (window.innerWidth.toString() + "x" + window.innerHeight.toString()), handleSpaces);
       return result;
-    };
+    }
 
     function makeLineIfValueDefined(key, value, callback) {
+      "use strict";
       if (value !== null && value !== undefined) {
         return makeLine(key, callback(value));
       } else {
@@ -153,13 +162,24 @@
       }
     }
     function makeLine(key, value) {
+      "use strict";
       return ((value !== null && value !== undefined) ? ('<tr><td valign="top">' + (key.length > 0 ? (key + ":") : "") + '</td><td valign="top">' + value + "</td></tr>") : "");
-    };
+    }
 
     function obfuscateUUID(uuid) {
       "use strict";
-      return (uuid !== null && uuid !== undefined) ? ("***" + uuid.substr(uuid.length - 6)) : "";
-    };
+      return (uuid !== null && uuid !== undefined) ? ("***" + uuid.substring(uuid.length - 6)) : "";
+    }
+
+    function safeDecode(text) {
+      "use strict";
+      try {
+        return decodeURIComponent(text);
+      } catch (e) {
+        console.error("bad URI component: " + text);
+        return text;   // malformed escape like "%" or "%E0%A4%A": keep it as-is
+      }
+    }
 
     var queryString = function () {
       "use strict";
@@ -169,18 +189,16 @@
       var query = window.location.search.substring(1);
       var vars = query.split("&");
       for (var i = 0; i < vars.length; i++) {
+        if (vars[i] === "") { continue; }
         var pair = vars[i].split("=");
-        pair[0] = decodeURIComponent(pair[0])
-        if (pair[1] !== undefined) { pair[1] = decodeURIComponent(pair[1]) }
-        if (typeof result[pair[0]] === "undefined") {
-          // pair[0] is the first key with this name
-          result[pair[0]] = pair[1];
-        } else if (typeof result[pair[0]] === "string") {
-          // pair[0] is the second key with this name
-          var arr = [ result[pair[0]], pair[1] ];
-          result[pair[0]] = arr;
-        } else { // pair[0] is the third or later key with this name
-          result[pair[0]].push(pair[1]);
+        var key = safeDecode(pair[0]);
+        var value = (pair[1] !== undefined) ? safeDecode(pair[1]) : undefined;
+        if (!Object.prototype.hasOwnProperty.call(result, key)) {
+          result[key] = value;
+        } else if (typeof result[key] === "string") {
+          result[key] = [ result[key], value ];
+        } else {
+          result[key].push(value);
         }
       }
       return result;
@@ -197,7 +215,7 @@
       document.getElementById("exception_message").innerHTML = name + ":&nbsp;" + message;
       document.getElementById("status").style.display = "block";
       document.getElementById("exception_message").style.display = "block";
-    };
+    }
   </script>
 </head>
 <body onload="console.error('body onload'); loadPlayer();">
